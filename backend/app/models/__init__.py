@@ -6,6 +6,14 @@ from app.models.mentor_request import MentorRequest
 from app.models.notification import Notification
 from app.models.organization import Organization, OrganizationMember
 from app.models.project import Project, ProjectSubmission
+from app.models.sponsorship import (
+    SponsorshipDeal,
+    SponsorshipDeliverable,
+    SponsorshipListing,
+    SponsorshipNegotiationMessage,
+    SponsorshipPackage,
+    SponsorshipProposal,
+)
 from app.models.stored_file import StoredFile
 from app.models.team import Team, TeamInvitation, TeamMember
 from app.models.team_message import TeamMessage, TeamMessageAttachment
@@ -37,5 +45,11 @@ __all__ = [
     "Announcement",
     "Notification",
     "MentorRequest",
+    "SponsorshipListing",
+    "SponsorshipPackage",
+    "SponsorshipProposal",
+    "SponsorshipNegotiationMessage",
+    "SponsorshipDeal",
+    "SponsorshipDeliverable",
 ]
 

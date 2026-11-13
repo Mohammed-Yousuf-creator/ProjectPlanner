@@ -15,6 +15,11 @@ from app.api.routes import (
     participants,
     projects,
     registrations,
+    sponsors,
+    sponsorship_deals,
+    sponsorship_deliverables,
+    sponsorship_listings,
+    sponsorship_proposals,
     submissions,
     team_files,
     team_messages,
@@ -47,3 +52,8 @@ api_router.include_router(announcements.router, tags=["Event Operations"])
 api_router.include_router(notifications.router, tags=["Event Operations"])
 api_router.include_router(checkins.router, tags=["Event Operations"])
 api_router.include_router(mentor_requests.router, tags=["Event Operations"])
+api_router.include_router(sponsors.router, tags=["Sponsorship Marketplace"])
+api_router.include_router(sponsorship_listings.router, tags=["Sponsorship Marketplace"])
+api_router.include_router(sponsorship_proposals.router, tags=["Sponsorship Marketplace"])
+api_router.include_router(sponsorship_deals.router, tags=["Sponsorship Marketplace"])
+api_router.include_router(sponsorship_deliverables.router, tags=["Sponsorship Marketplace"])

@@ -9,6 +9,7 @@ This repository contains the backend for an event and hackathon management platf
 - **Phase 5:** Team Collaboration (task boards, multi-assignee task management, persistent team chat, WebSockets real-time updates, and local image/video storage).
 - **Phase 6:** Projects, Submission Versions, Judging Criteria, Evaluations, and Leaderboards.
 - **Phase 7:** Event Operations (event schedules, announcements, audience-targeted in-app notifications, participant check-in metrics, and mentor requests lifecycle).
+- **Phase 8:** Sponsorship Marketplace (sponsor discovery, bidirectional sponsorship listings, packages, proposals, negotiations & counteroffers, deals snapshotting, and deliverable tracking).
 
 ---
 
@@ -57,7 +58,12 @@ backend/
 │   │       ├── announcements.py # /api/v1/events/{event_id}/announcements, /api/v1/announcements/*
 │   │       ├── notifications.py # /api/v1/notifications/me/*
 │   │       ├── checkins.py      # /api/v1/events/{event_id}/check-ins/*, check-in operations
-│   │       └── mentor_requests.py# /api/v1/events/{event_id}/mentor-requests, /api/v1/mentor-requests/*
+│   │       ├── mentor_requests.py# /api/v1/events/{event_id}/mentor-requests, /api/v1/mentor-requests/*
+│   │       ├── sponsors.py      # /api/v1/sponsors discovery
+│   │       ├── sponsorship_listings.py # /api/v1/sponsorship-listings, /packages, org listings
+│   │       ├── sponsorship_proposals.py# /api/v1/sponsorship-proposals, negotiations, accept/reject
+│   │       ├── sponsorship_deals.py    # /api/v1/sponsorship-deals
+│   │       └── sponsorship_deliverables.py# /api/v1/sponsorship-deliverables
 │   ├── core/
 │   │   ├── __init__.py
 │   │   ├── config.py            # Pydantic-settings configuration & .env loading
@@ -69,7 +75,7 @@ backend/
 │   │   ├── base.py              # DeclarativeBase & UTCDateTime TypeDecorator
 │   │   └── session.py           # SQLite connection, engine & SessionLocal factory
 │   ├── models/
-│   │   ├── __init__.py          # Exports and registers all 24 models with Base
+│   │   ├── __init__.py          # Exports and registers all 30 models with Base
 │   │   ├── user.py              # User and UserProfile models
 │   │   ├── organization.py      # Organization and OrganizationMember models
 │   │   ├── event.py             # Event, EventMembership, EventTrack models
@@ -82,7 +88,8 @@ backend/
 │   │   ├── event_schedule.py    # EventScheduleItem model
 │   │   ├── announcement.py      # Announcement model
 │   │   ├── notification.py      # Notification model
-│   │   └── mentor_request.py    # MentorRequest model
+│   │   ├── mentor_request.py    # MentorRequest model
+│   │   └── sponsorship.py       # SponsorshipListing, Package, Proposal, Message, Deal, Deliverable
 │   ├── schemas/
 │   │   ├── __init__.py          # Pydantic schema exports
 │   │   ├── auth.py              # RegisterRequest, LoginRequest, AuthResponse, TokenResponse
@@ -102,7 +109,8 @@ backend/
 │   │   ├── announcement.py      # AnnouncementCreate, AnnouncementUpdate, AnnouncementRead
 │   │   ├── notification.py      # NotificationRead, NotificationUnreadCountResponse
 │   │   ├── checkin.py           # CheckInAttendeeRead, CheckInSummaryRead
-│   │   └── mentor_request.py    # MentorRequestCreate, MentorRequestAssign, MentorRequestStatusUpdate, MentorRequestRead
+│   │   ├── mentor_request.py    # MentorRequestCreate, MentorRequestAssign, MentorRequestStatusUpdate, MentorRequestRead
+│   │   └── sponsorship.py       # Sponsorship Listing, Package, Proposal, Deal, Deliverable schemas
 │   ├── services/
 │   │   ├── __init__.py
 │   │   ├── auth_service.py         # Registration & authentication business logic
@@ -122,7 +130,8 @@ backend/
 │   │   ├── event_schedule_service.py # Schedule items CRUD, chronological ordering, organizer controls
 │   │   ├── announcement_service.py # Audience-targeted announcements, transactional notification dispatch
 │   │   ├── checkin_service.py      # Attendee check-in list, search, duplicate prevention, undo & metrics
-│   │   └── mentor_request_service.py # Participant mentor assistance requests, mentor assign & resolution workflow
+│   │   ├── mentor_request_service.py # Participant mentor assistance requests, mentor assign & resolution workflow
+│   │   └── sponsorship_service.py  # Bidirectional listings, packages, proposals, negotiations, deals, deliverables
 │   └── storage/
 │       ├── __init__.py
 │       └── local_storage.py        # Local disk storage provider with chunked streaming and Pillow validation
@@ -138,7 +147,7 @@ backend/
 │   ├── conftest.py                       # Pytest fixtures, test database setup, and TestClient
 │   ├── test_auth.py                      # Authentication & user endpoint tests
 │   ├── test_health.py                    # Health check & DB connectivity tests
-│   ├── test_models.py                    # All 24 models, constraints, and relationship tests
+│   ├── test_models.py                    # All 30 models, constraints, and relationship tests
 │   ├── test_organizations.py             # Organization CRUD, roles, and invitation tests
 │   ├── test_events.py                    # Event lifecycle, draft visibility, publishing tests
 │   ├── test_tracks.py                    # Event track creation, update, and deletion tests
@@ -148,7 +157,8 @@ backend/
 │   ├── test_teams.py                     # Team creation, discovery, join code, invitations, and membership tests
 │   ├── test_team_collaboration.py        # Tasks, persistent messaging, WebSockets, and file upload tests
 │   ├── test_projects_and_judging.py      # Projects, submissions, judging criteria, evaluations, and leaderboards
-│   └── test_event_operations.py          # Schedule, announcements, notifications, check-ins, mentor requests
+│   ├── test_event_operations.py          # Schedule, announcements, notifications, check-ins, mentor requests
+│   └── test_sponsorship_marketplace.py  # Sponsor discovery, listings, packages, proposals, deals, deliverables
 ├── .env                         # Local environment settings (ignored by git)
 ├── .env.example                 # Example environment template
 ├── .gitignore                   # Git ignore patterns
@@ -161,7 +171,7 @@ backend/
 
 ## 3. Database Architecture & Models
 
-The system comprises 24 relational tables:
+The system comprises 30 relational tables:
 
 1. **`users`**: Central account table. Holds UUID, unique normalized email, unique normalized username, Argon2 password hash, account status, email verification timestamp, and UTC audit timestamps.
 2. **`user_profiles`**: One-to-one child record created automatically upon user registration with display name, bio, social links, and visibility settings.
@@ -187,6 +197,12 @@ The system comprises 24 relational tables:
 22. **`announcements`**: Event broadcast messages with audience targeting (`all`, `participants`, `judges`, `mentors`, `team`), `status` (`draft`, `published`, `withdrawn`), and published timestamp.
 23. **`notifications`**: In-app user notifications with `type`, `title`, `body`, read tracking (`is_read`, `read_at`), contextual reference IDs, and user recipient indexing.
 24. **`mentor_requests`**: On-demand participant assistance requests with `topic`, `status` (`pending`, `assigned`, `in_progress`, `resolved`, `cancelled`, `rejected`), assigned mentor, resolution notes, and timestamps.
+25. **`sponsorship_listings`**: Sponsorship opportunities created by organizers or sponsors. Columns: `id`, `owner_organization_id`, `event_id`, `listing_type` (`seeking_sponsors`, `offering_sponsorship`), `title`, `description`, `audience_description`, `benefits`, `min_budget`, `max_budget`, `currency`, `status` (`draft`, `published`, `closed`), `expires_at`, `created_by_user_id`, `created_at`, `updated_at`.
+26. **`sponsorship_packages`**: Commercial packages attached to a sponsorship listing with `name`, `description`, `price`, `currency`, `benefits`, and `available_slots`.
+27. **`sponsorship_proposals`**: Formal commercial proposals connecting two organizations for a target event with `listing_id`, `proposer_organization_id`, `target_event_id`, `package_id`, `proposed_amount`, `currency`, `proposed_benefits`, `message`, and `status` (`pending`, `negotiating`, `accepted`, `rejected`, `withdrawn`, `expired`).
+28. **`sponsorship_negotiation_messages`**: Structured conversation and counteroffer history with `proposal_id`, `author_organization_id`, `author_user_id`, `message_type` (`message`, `counter_offer`), `message`, `counter_amount`, `currency`, `counter_package_id`, and `counter_benefits`.
+29. **`sponsorship_deals`**: Immutable contract snapshots finalized upon proposal acceptance with `proposal_id` (unique), `event_id`, `sponsor_organization_id`, `organizer_organization_id`, `agreed_amount`, `currency`, `agreed_terms`, `starts_at`, `ends_at`, and `status` (`active`, `completed`, `cancelled`).
+30. **`sponsorship_deliverables`**: Benefit tracking and proof items for deals with `deal_id`, `responsible_organization_id`, `title`, `description`, `due_at`, `status` (`pending`, `in_progress`, `completed`, `rejected`, `cancelled`), `evidence_url` (validated HTTP/HTTPS), and `completed_at`.
 
 ---
 
@@ -598,6 +614,109 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 
 ---
 
+### Phase 8: Sponsorship Marketplace
+
+#### Sponsor Discovery & Public Listings
+- **`GET /api/v1/sponsors`**:
+  - Discover active sponsor organizations offering sponsorship.
+  - Supports search across organization name and description, currency filtering, minimum/maximum budget filtering, and pagination.
+  - Returns public sponsor profile with active listing count and public listing summaries. Excludes private organization details.
+- **`GET /api/v1/sponsorship-listings`**:
+  - Public discovery endpoint returning published, unexpired sponsorship listings.
+  - Supports filtering by `listing_type` (`seeking_sponsors`, `offering_sponsorship`), `event_type`, `city`, `organization_name`, `min_budget`, `max_budget`, and `currency`.
+  - Excludes drafts, closed listings, and expired listings.
+- **`GET /api/v1/sponsorship-listings/{listing_id}`**:
+  - Retrieve detailed public listing information with commercial packages and public event information.
+  - Drafts, closed, and expired listings are strictly restricted to active members of the listing owner organization (returning `HTTP 404 Not Found` to unauthorized users).
+
+#### Sponsorship Listing Management
+- **`POST /api/v1/organizations/{organization_id}/sponsorship-listings`**:
+  - Create a sponsorship listing in `draft` status.
+  - Restricted to active organization `owner` and `admin`.
+  - Validates organization type compatibility:
+    - `seeking_sponsors`: Requires organization type `organizer` or `both`, and requires `event_id` referencing an event owned by the organization.
+    - `offering_sponsorship`: Requires organization type `sponsor` or `both`. `event_id` is optional and validated against organization ownership if provided.
+  - Validates non-negative budgets and `max_budget >= min_budget`.
+- **`GET /api/v1/organizations/{organization_id}/sponsorship-listings`**:
+  - List all sponsorship listings (including drafts) for active organization members.
+- **`PATCH /api/v1/sponsorship-listings/{listing_id}`**:
+  - Update draft sponsorship listing details. Modifying published or closed listings is rejected (`HTTP 400 Bad Request`).
+- **`POST /api/v1/sponsorship-listings/{listing_id}/publish`**:
+  - Transition a draft listing to `published`.
+  - Validates all prerequisite constraints (active organization, valid event ownership, unexpired dates). Closed and expired listings cannot be published.
+- **`POST /api/v1/sponsorship-listings/{listing_id}/close`**:
+  - Close a listing (`status = "closed"`). Preserves existing proposals and finalized deals.
+
+#### Package Management
+- **`POST /api/v1/sponsorship-listings/{listing_id}/packages`**:
+  - Create a commercial sponsorship package (`name`, `price >= 0`, `currency`, `benefits`, optional positive `available_slots`).
+  - Restricted to active organization `owner` and `admin`.
+- **`GET /api/v1/sponsorship-listings/{listing_id}/packages`**:
+  - List packages for a sponsorship listing.
+- **`PATCH /api/v1/sponsorship-packages/{package_id}`**:
+  - Update package details.
+  - If any proposal has referenced the package, commercial terms (`price`, `currency`, `benefits`) are protected from silent modification (`HTTP 400 Bad Request`).
+- **`DELETE /api/v1/sponsorship-packages/{package_id}`**:
+  - Delete an unreferenced package. Packages referenced by any proposal cannot be deleted (`HTTP 400 Bad Request`).
+
+#### Proposal Management
+- **`POST /api/v1/sponsorship-listings/{listing_id}/proposals`**:
+  - Submit a formal sponsorship proposal.
+  - Restricted to active `owner` and `admin` of the proposing organization.
+  - Automatically identifies and validates proposing organization:
+    - For `offering_sponsorship` listings: Proposer is the organizer owning the `target_event_id`.
+    - For `seeking_sponsors` listings: Proposer must be an active sponsor organization where the user has `owner`/`admin` rights.
+  - Prevents proposing to one's own organization.
+  - Prevents duplicate active proposals (`pending` or `negotiating`) for the same listing and event (`HTTP 409 Conflict`).
+  - Dispatches `sponsorship_proposal_received` in-app notification to the listing owner organization.
+- **`GET /api/v1/organizations/{organization_id}/sponsorship-proposals`**:
+  - List incoming and outgoing proposals for active organization members. Supports filtering by `direction` (`incoming`, `outgoing`) and `status`.
+- **`GET /api/v1/sponsorship-proposals/{proposal_id}`**:
+  - View full proposal details, terms, and complete chronological negotiation history. Strictly restricted to members of the two participating organizations (`HTTP 403 Forbidden` to outsiders).
+
+#### Negotiations & Counteroffers
+- **`POST /api/v1/sponsorship-proposals/{proposal_id}/messages`**:
+  - Add a negotiation message or formal counteroffer (`counter_amount`, `currency`, `counter_package_id`, `counter_benefits`).
+  - Restricted to active `owner` and `admin` of either participating organization while proposal is `pending` or `negotiating`.
+  - Counteroffers advance status to `negotiating` and become the current terms for acceptance.
+  - Dispatches `sponsorship_counteroffer_received` or `sponsorship_negotiation_message_received` in-app notifications to the partner organization.
+- **`POST /api/v1/sponsorship-proposals/{proposal_id}/accept`**:
+  - Accept the current proposal or counteroffer.
+  - Strictly restricted to the receiving party:
+    - If no counteroffer exists: Only the listing owner organization can accept.
+    - If a counteroffer exists: Only the party receiving the latest counteroffer can accept.
+  - In a single database transaction:
+    - Marks proposal as `accepted`.
+    - Decrements package available slots (if applicable).
+    - Snapshots commercial terms into a new immutable `SponsorshipDeal`.
+    - Dispatches `sponsorship_proposal_accepted` in-app notifications.
+- **`POST /api/v1/sponsorship-proposals/{proposal_id}/reject`**:
+  - Reject the current proposal or counteroffer. Restricted to the receiving party. Sets status to `rejected` and notifies the other party.
+- **`POST /api/v1/sponsorship-proposals/{proposal_id}/withdraw`**:
+  - Withdraw proposal. Allowed only for the original proposing organization while `pending` or `negotiating`.
+
+#### Deals & Deliverables
+- **`GET /api/v1/organizations/{organization_id}/sponsorship-deals`**:
+  - List all sponsorship deals involving the organization (as sponsor or organizer), with deliverable completion metrics.
+- **`GET /api/v1/sponsorship-deals/{deal_id}`**:
+  - Return complete deal snapshot, agreed commercial terms, and deliverable tracking items. Restricted to active members of the two deal parties.
+- **`PATCH /api/v1/sponsorship-deals/{deal_id}/status`**:
+  - Transition deal status from `active` to `completed` or `cancelled`.
+  - Reopening completed or cancelled deals is rejected (`HTTP 400 Bad Request`).
+- **`POST /api/v1/sponsorship-deals/{deal_id}/deliverables`**:
+  - Create a deliverable for tracking promised sponsorship benefits (`responsible_organization_id`, `title`, `description`, `due_at`).
+  - Validates that `responsible_organization_id` is one of the two deal parties.
+  - Dispatches `sponsorship_deliverable_assigned` in-app notification.
+- **`GET /api/v1/sponsorship-deals/{deal_id}/deliverables`**:
+  - List deliverables for a deal.
+- **`PATCH /api/v1/sponsorship-deliverables/{deliverable_id}`**:
+  - Update deliverable details, status (`pending`, `in_progress`, `completed`, `rejected`, `cancelled`), or evidence.
+  - Enforces HTTP/HTTPS protocol validation on `evidence_url`.
+  - Automatically records `completed_at` timestamp upon entering `completed` status.
+  - Dispatches `sponsorship_deliverable_completed` or `sponsorship_deliverable_rejected` in-app notifications.
+
+---
+
 ## 8. Running the Test Suite
 
 The test suite runs with `pytest` against an isolated temporary SQLite database:
@@ -606,9 +725,9 @@ The test suite runs with `pytest` against an isolated temporary SQLite database:
 pytest -v
 ```
 
-Total tests: **87 passing** across 13 test modules:
+Total tests: **93 passing** across 14 test modules:
 - `test_auth.py` (11 tests): Registration, duplicate checks, login, JWT validation, expiration, user me.
-- `test_models.py` (8 tests): All 24 tables registered, foreign keys, unique & check constraints, relationships.
+- `test_models.py` (8 tests): All 30 tables registered, foreign keys, unique & check constraints, relationships.
 - `test_health.py` (1 test): Health check & database ping.
 - `test_organizations.py` (6 tests): Org CRUD, slug uniqueness, user org listing, invitations accept/reject, member removal.
 - `test_events.py` (6 tests): Event creation, draft visibility, publishing validation, public discovery filtering, cancelling.
@@ -620,3 +739,4 @@ Total tests: **87 passing** across 13 test modules:
 - `test_team_collaboration.py` (11 tests): Tasks CRUD, status transitions, assignees replacement, persistent chat, attachments, WebSocket authentication, real-time broadcasts, file validation, oversized rejections, and disconnects on leave/disband.
 - `test_projects_and_judging.py` (8 tests): Project creation, single project per team constraint, submission versions, draft editing, submitted immutability, deadline & team size checks, judge management, criteria immutability, evaluation lifecycle, conflict of interest checks, leaderboard dynamic calculation, ties, and access control.
 - `test_event_operations.py` (5 tests): Event schedule management, announcements & audience targeting, notifications privacy & unread tracking, check-in metrics & undo, mentor requests assignment & lifecycle.
+- `test_sponsorship_marketplace.py` (6 tests): Sponsor discovery, bidirectional listings, packages, proposals, negotiations & counteroffers, deals snapshotting, deliverable lifecycle, and notification dispatch.
