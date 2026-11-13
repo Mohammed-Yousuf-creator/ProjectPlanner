@@ -9,6 +9,7 @@ from app.db.base import Base, UTCDateTime
 
 if TYPE_CHECKING:
     from app.models.event import EventMembership
+    from app.models.notification import Notification
     from app.models.organization import OrganizationMember
     from app.models.team import TeamMember
 
@@ -73,6 +74,11 @@ class User(Base):
     )
     team_memberships: Mapped[List["TeamMember"]] = relationship(
         "TeamMember",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    notifications: Mapped[List["Notification"]] = relationship(
+        "Notification",
         back_populates="user",
         cascade="all, delete-orphan",
     )

@@ -1,4 +1,38 @@
+from app.services.announcement_service import (
+    create_announcement,
+    list_announcements,
+    publish_announcement,
+    update_draft_announcement,
+    withdraw_announcement,
+)
 from app.services.auth_service import authenticate_user, register_user
+from app.services.checkin_service import (
+    check_in_participant_op,
+    get_checkin_summary,
+    list_event_checkins,
+    undo_check_in_participant,
+)
+from app.services.event_schedule_service import (
+    create_schedule_item,
+    delete_schedule_item,
+    list_event_schedule,
+    update_schedule_item,
+)
+from app.services.mentor_request_service import (
+    assign_mentor,
+    cancel_mentor_request,
+    create_mentor_request,
+    list_event_mentor_requests,
+    list_my_mentor_requests,
+    update_mentor_request_status,
+)
+from app.services.notification_service import (
+    create_notification,
+    get_unread_count,
+    list_user_notifications,
+    mark_all_read,
+    mark_notification_read,
+)
 from app.services.event_service import (
     cancel_event,
     create_event,
@@ -168,4 +202,28 @@ __all__ = [
     "save_draft_evaluation",
     "finalize_evaluation",
     "get_event_leaderboard",
+    "create_schedule_item",
+    "list_event_schedule",
+    "update_schedule_item",
+    "delete_schedule_item",
+    "create_announcement",
+    "list_announcements",
+    "update_draft_announcement",
+    "publish_announcement",
+    "withdraw_announcement",
+    "create_notification",
+    "list_user_notifications",
+    "get_unread_count",
+    "mark_notification_read",
+    "mark_all_read",
+    "list_event_checkins",
+    "get_checkin_summary",
+    "check_in_participant_op",
+    "undo_check_in_participant",
+    "create_mentor_request",
+    "list_my_mentor_requests",
+    "list_event_mentor_requests",
+    "assign_mentor",
+    "update_mentor_request_status",
+    "cancel_mentor_request",
 ]

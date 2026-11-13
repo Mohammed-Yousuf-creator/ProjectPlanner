@@ -1,8 +1,32 @@
+from app.schemas.announcement import (
+    AnnouncementCreate,
+    AnnouncementRead,
+    AnnouncementUpdate,
+)
 from app.schemas.auth import (
     AuthResponse,
     LoginRequest,
     RegisterRequest,
     TokenResponse,
+)
+from app.schemas.checkin import (
+    CheckInAttendeeRead,
+    CheckInSummaryRead,
+)
+from app.schemas.event_schedule import (
+    EventScheduleItemCreate,
+    EventScheduleItemRead,
+    EventScheduleItemUpdate,
+)
+from app.schemas.mentor_request import (
+    MentorRequestAssign,
+    MentorRequestCreate,
+    MentorRequestRead,
+    MentorRequestStatusUpdate,
+)
+from app.schemas.notification import (
+    NotificationRead,
+    NotificationUnreadCountResponse,
 )
 from app.schemas.event import (
     EventCreate,
@@ -178,4 +202,18 @@ __all__ = [
     "EvaluationSaveRequest",
     "EvaluationRead",
     "LeaderboardEntryRead",
+    "EventScheduleItemCreate",
+    "EventScheduleItemUpdate",
+    "EventScheduleItemRead",
+    "AnnouncementCreate",
+    "AnnouncementUpdate",
+    "AnnouncementRead",
+    "NotificationRead",
+    "NotificationUnreadCountResponse",
+    "MentorRequestCreate",
+    "MentorRequestAssign",
+    "MentorRequestStatusUpdate",
+    "MentorRequestRead",
+    "CheckInAttendeeRead",
+    "CheckInSummaryRead",
 ]

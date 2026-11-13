@@ -8,6 +8,7 @@ This repository contains the backend for an event and hackathon management platf
 - **Phase 4:** Team Formation and Membership Management.
 - **Phase 5:** Team Collaboration (task boards, multi-assignee task management, persistent team chat, WebSockets real-time updates, and local image/video storage).
 - **Phase 6:** Projects, Submission Versions, Judging Criteria, Evaluations, and Leaderboards.
+- **Phase 7:** Event Operations (event schedules, announcements, audience-targeted in-app notifications, participant check-in metrics, and mentor requests lifecycle).
 
 ---
 
@@ -51,7 +52,12 @@ backend/
 │   │       ├── projects.py      # /api/v1/events/{event_id}/projects, /api/v1/teams/{team_id}/project
 │   │       ├── submissions.py   # /api/v1/projects/{project_id}/submissions/*
 │   │       ├── judging.py       # /api/v1/events/{event_id}/judges, judging-criteria, evaluations
-│   │       └── leaderboards.py  # /api/v1/events/{event_id}/leaderboard
+│   │       ├── leaderboards.py  # /api/v1/events/{event_id}/leaderboard
+│   │       ├── event_schedule.py# /api/v1/events/{event_id}/schedule, /api/v1/schedule/{item_id}
+│   │       ├── announcements.py # /api/v1/events/{event_id}/announcements, /api/v1/announcements/*
+│   │       ├── notifications.py # /api/v1/notifications/me/*
+│   │       ├── checkins.py      # /api/v1/events/{event_id}/check-ins/*, check-in operations
+│   │       └── mentor_requests.py# /api/v1/events/{event_id}/mentor-requests, /api/v1/mentor-requests/*
 │   ├── core/
 │   │   ├── __init__.py
 │   │   ├── config.py            # Pydantic-settings configuration & .env loading
@@ -63,7 +69,7 @@ backend/
 │   │   ├── base.py              # DeclarativeBase & UTCDateTime TypeDecorator
 │   │   └── session.py           # SQLite connection, engine & SessionLocal factory
 │   ├── models/
-│   │   ├── __init__.py          # Exports and registers all 20 models with Base
+│   │   ├── __init__.py          # Exports and registers all 24 models with Base
 │   │   ├── user.py              # User and UserProfile models
 │   │   ├── organization.py      # Organization and OrganizationMember models
 │   │   ├── event.py             # Event, EventMembership, EventTrack models
@@ -72,7 +78,11 @@ backend/
 │   │   ├── team_message.py      # TeamMessage and TeamMessageAttachment models
 │   │   ├── stored_file.py       # StoredFile model
 │   │   ├── project.py           # Project and ProjectSubmission models
-│   │   └── judging.py           # JudgingCriteria, Evaluation, EvaluationScore models
+│   │   ├── judging.py           # JudgingCriteria, Evaluation, EvaluationScore models
+│   │   ├── event_schedule.py    # EventScheduleItem model
+│   │   ├── announcement.py      # Announcement model
+│   │   ├── notification.py      # Notification model
+│   │   └── mentor_request.py    # MentorRequest model
 │   ├── schemas/
 │   │   ├── __init__.py          # Pydantic schema exports
 │   │   ├── auth.py              # RegisterRequest, LoginRequest, AuthResponse, TokenResponse
@@ -87,7 +97,12 @@ backend/
 │   │   ├── stored_file.py       # StoredFileRead
 │   │   ├── project.py           # ProjectCreate, ProjectRead, ProjectDetailRead, ProjectPublicRead
 │   │   ├── submission.py        # ProjectSubmissionCreate, ProjectSubmissionUpdate, ProjectSubmissionRead
-│   │   └── judging.py           # Judge*, JudgingCriteria*, Evaluation*, LeaderboardEntryRead
+│   │   ├── judging.py           # Judge*, JudgingCriteria*, Evaluation*, LeaderboardEntryRead
+│   │   ├── event_schedule.py    # EventScheduleItemCreate, EventScheduleItemUpdate, EventScheduleItemRead
+│   │   ├── announcement.py      # AnnouncementCreate, AnnouncementUpdate, AnnouncementRead
+│   │   ├── notification.py      # NotificationRead, NotificationUnreadCountResponse
+│   │   ├── checkin.py           # CheckInAttendeeRead, CheckInSummaryRead
+│   │   └── mentor_request.py    # MentorRequestCreate, MentorRequestAssign, MentorRequestStatusUpdate, MentorRequestRead
 │   ├── services/
 │   │   ├── __init__.py
 │   │   ├── auth_service.py         # Registration & authentication business logic
@@ -102,7 +117,12 @@ backend/
 │   │   ├── project_service.py      # Project creation, team scoping, public discovery
 │   │   ├── submission_service.py   # Versioned submissions, drafts, deadline validation, immutability
 │   │   ├── judging_service.py      # Judge management, criteria configuration, draft & submitted evaluations
-│   │   └── leaderboard_service.py  # Dynamic weighted score calculation, ties, and access control
+│   │   ├── leaderboard_service.py  # Dynamic weighted score calculation, ties, and access control
+│   │   ├── notification_service.py # In-app notifications creation, batch dispatch, deduplication & mark read
+│   │   ├── event_schedule_service.py # Schedule items CRUD, chronological ordering, organizer controls
+│   │   ├── announcement_service.py # Audience-targeted announcements, transactional notification dispatch
+│   │   ├── checkin_service.py      # Attendee check-in list, search, duplicate prevention, undo & metrics
+│   │   └── mentor_request_service.py # Participant mentor assistance requests, mentor assign & resolution workflow
 │   └── storage/
 │       ├── __init__.py
 │       └── local_storage.py        # Local disk storage provider with chunked streaming and Pillow validation
@@ -118,7 +138,7 @@ backend/
 │   ├── conftest.py                       # Pytest fixtures, test database setup, and TestClient
 │   ├── test_auth.py                      # Authentication & user endpoint tests
 │   ├── test_health.py                    # Health check & DB connectivity tests
-│   ├── test_models.py                    # All 10 models, constraints, and relationship tests
+│   ├── test_models.py                    # All 24 models, constraints, and relationship tests
 │   ├── test_organizations.py             # Organization CRUD, roles, and invitation tests
 │   ├── test_events.py                    # Event lifecycle, draft visibility, publishing tests
 │   ├── test_tracks.py                    # Event track creation, update, and deletion tests
@@ -126,7 +146,9 @@ backend/
 │   ├── test_participant_dashboard.py     # Participant dashboard, event categorization, and detail tests
 │   ├── test_organizer_participants.py    # Organizer participant management, approval, and check-in tests
 │   ├── test_teams.py                     # Team creation, discovery, join code, invitations, and membership tests
-│   └── test_team_collaboration.py        # Tasks, persistent messaging, WebSockets, and file upload tests
+│   ├── test_team_collaboration.py        # Tasks, persistent messaging, WebSockets, and file upload tests
+│   ├── test_projects_and_judging.py      # Projects, submissions, judging criteria, evaluations, and leaderboards
+│   └── test_event_operations.py          # Schedule, announcements, notifications, check-ins, mentor requests
 ├── .env                         # Local environment settings (ignored by git)
 ├── .env.example                 # Example environment template
 ├── .gitignore                   # Git ignore patterns
@@ -139,7 +161,7 @@ backend/
 
 ## 3. Database Architecture & Models
 
-The system comprises 15 relational tables:
+The system comprises 24 relational tables:
 
 1. **`users`**: Central account table. Holds UUID, unique normalized email, unique normalized username, Argon2 password hash, account status, email verification timestamp, and UTC audit timestamps.
 2. **`user_profiles`**: One-to-one child record created automatically upon user registration with display name, bio, social links, and visibility settings.
@@ -156,6 +178,15 @@ The system comprises 15 relational tables:
 13. **`team_messages`**: Persistent team chat messages. Columns: `id`, `team_id`, `sender_user_id`, `body`, `created_at`, `edited_at`, `deleted_at`.
 14. **`stored_files`**: Safe file storage metadata. Columns: `id`, `team_id`, `uploaded_by_user_id`, `storage_provider`, `storage_key` (unique), `original_filename`, `mime_type`, `size_bytes`, `checksum_sha256`, `created_at`, `deleted_at`.
 15. **`team_message_attachments`**: Attachment join table between messages and stored files with unique constraint guaranteeing a file is attached to at most one message. Columns: `id`, `message_id`, `file_id`, `created_at`.
+16. **`projects`**: One project per team per event with unique `(event_id, team_id)`, track reference, and creator foreign key.
+17. **`project_submissions`**: Sequential version history (`version_number`) per project, draft/submitted status, metadata, repository and demo URLs, and submission timestamp.
+18. **`judging_criteria`**: Scoring criteria per event with `name`, `max_score > 0`, `weight > 0`, and unique `(event_id, name)`.
+19. **`evaluations`**: Judge evaluations for submissions with draft/submitted status, general feedback, and unique `(submission_id, judge_user_id)`.
+20. **`evaluation_scores`**: Individual criterion scores per evaluation with `score` in `[0, max_score]` and unique `(evaluation_id, criterion_id)`.
+21. **`event_schedule_items`**: Chronological agenda items per event with `item_type`, `starts_at`, `ends_at`, `status` (`active`, `cancelled`), venue, and meeting URL.
+22. **`announcements`**: Event broadcast messages with audience targeting (`all`, `participants`, `judges`, `mentors`, `team`), `status` (`draft`, `published`, `withdrawn`), and published timestamp.
+23. **`notifications`**: In-app user notifications with `type`, `title`, `body`, read tracking (`is_read`, `read_at`), contextual reference IDs, and user recipient indexing.
+24. **`mentor_requests`**: On-demand participant assistance requests with `topic`, `status` (`pending`, `assigned`, `in_progress`, `resolved`, `cancelled`, `rejected`), assigned mentor, resolution notes, and timestamps.
 
 ---
 
@@ -478,6 +509,95 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 
 ---
 
+### Phase 7: Event Operations
+
+#### Event Schedule Management
+- **`POST /api/v1/events/{event_id}/schedule`**:
+  - Add an item to the event agenda/schedule (`title`, `item_type`, `starts_at`, `ends_at`, optional `venue`, `meeting_url`).
+  - Restricted to organization `owner` and `admin`. Validates `ends_at >= starts_at`.
+- **`GET /api/v1/events/{event_id}/schedule`**:
+  - List schedule items ordered chronologically (`starts_at ASC, ends_at ASC`).
+  - Publicly accessible for published public events; requires event membership or organizer access otherwise.
+  - Active items returned by default; `include_cancelled=true` query parameter allowed for organizers only.
+- **`PATCH /api/v1/schedule/{item_id}`**:
+  - Update schedule item fields. Restricted to organization `owner` and `admin`.
+- **`DELETE /api/v1/schedule/{item_id}`**:
+  - Soft-delete schedule item (sets `status = "cancelled"`). Restricted to organization `owner` and `admin`.
+
+#### Announcement Management & Notification Dispatch
+- **`POST /api/v1/events/{event_id}/announcements`**:
+  - Create a draft announcement (`title`, `body`, `target_audience`: `all`, `participants`, `judges`, `mentors`, `team`, optional `target_team_id`).
+  - Restricted to organization `owner` and `admin`.
+- **`GET /api/v1/events/{event_id}/announcements`**:
+  - Return visible announcements filtered by user role and audience targeting.
+  - Drafts visible only to organizers. Published announcements filtered:
+    - `all`: All active event members.
+    - `participants`: Approved/registered participants.
+    - `judges`: Approved judges.
+    - `mentors`: Approved mentors.
+    - `team`: Active members of the targeted team only.
+- **`PATCH /api/v1/announcements/{announcement_id}`**:
+  - Edit draft announcement. Publishing or modifying an already published/withdrawn announcement is rejected (`400 Bad Request`).
+- **`POST /api/v1/announcements/{announcement_id}/publish`**:
+  - Publish announcement (`status = "published"`, `published_at = utcnow`).
+  - Transactionally resolves eligible recipients based on target audience and dispatches in-app `Notification` records.
+  - Published announcements are immutable against further content edits.
+- **`POST /api/v1/announcements/{announcement_id}/withdraw`**:
+  - Withdraw announcement (`status = "withdrawn"`). Existing delivered notifications are preserved.
+
+#### In-App Notifications
+- **`GET /api/v1/notifications/me`**:
+  - Retrieve paginated notifications for the authenticated user, ordered newest first (`created_at DESC`).
+  - Supports `unread_only=true` filter and `limit`/`offset` pagination. Strict user isolation enforced.
+- **`GET /api/v1/notifications/me/unread-count`**:
+  - Return total unread notification count for the authenticated user.
+- **`PATCH /api/v1/notifications/{notification_id}/read`**:
+  - Mark a single notification as read (`is_read = true`, `read_at = utcnow`). Restricted to notification owner.
+- **`POST /api/v1/notifications/me/read-all`**:
+  - Mark all notifications for the authenticated user as read in a single batch operation.
+
+#### Participant Check-in Operations & Metrics
+- **`GET /api/v1/events/{event_id}/check-ins`**:
+  - Search and filter attendees for check-in management.
+  - Restricted to organization `owner` and `admin`.
+  - Supports `checked_in=true/false` filter, text search across username/email/display name, and pagination.
+- **`GET /api/v1/events/{event_id}/check-ins/summary`**:
+  - Return aggregated check-in metrics: `total_eligible_participants`, `total_checked_in`, `attendance_percentage`, `last_check_in_at`.
+  - Accurately excludes withdrawn and rejected registrations from attendance denominator.
+- **`POST /api/v1/events/{event_id}/participants/{user_id}/check-in`**:
+  - Mark an approved or registered participant as checked in.
+  - Prevents duplicate check-in if already checked in (`400 Bad Request`).
+  - Restricted to organization `owner` and `admin`.
+- **`DELETE /api/v1/events/{event_id}/participants/{user_id}/check-in`**:
+  - Undo participant check-in (`checked_in_at = None`).
+  - Restricted to organization `owner` and `admin`. Rejects undoing a participant who is not currently checked in.
+
+#### Mentor Request Management
+- **`POST /api/v1/events/{event_id}/mentor-requests`**:
+  - Request mentor assistance (`topic`, `description`, `priority`: `low`, `medium`, `high`, `urgent`, optional `team_id`).
+  - Restricted to registered or approved participants of the event.
+  - If `team_id` is specified, verifies requester is an active member of that team.
+- **`GET /api/v1/participants/me/mentor-requests`**:
+  - Return all mentor requests created by the authenticated participant across events.
+- **`GET /api/v1/events/{event_id}/mentor-requests`**:
+  - List mentor requests for an event with role-based visibility:
+    - Organizers see all requests in the event.
+    - Mentors see unassigned requests (`status = "pending"`) plus requests assigned to themselves.
+    - Non-mentor/non-organizer participants are denied access (`403 Forbidden`).
+- **`PATCH /api/v1/mentor-requests/{request_id}/assign`**:
+  - Assign request to an approved event mentor (`mentor_user_id`).
+  - Allowed for event organizers or the mentor claiming the request for themselves.
+  - Sets `status = "assigned"` and `assigned_mentor_user_id`, and dispatches notification to the requester.
+- **`PATCH /api/v1/mentor-requests/{request_id}/status`**:
+  - Advance status (`assigned -> in_progress -> resolved` or `pending -> rejected`).
+  - Enforces valid state machine transitions.
+  - Recording `resolved` captures `resolved_at` and optional `resolution_note`.
+  - Dispatches status change notifications to requester. Restricted to assigned mentor or event organizers.
+- **`POST /api/v1/mentor-requests/{request_id}/cancel`**:
+  - Requester cancels their own request while in `pending` status. Sets `status = "cancelled"`.
+
+---
+
 ## 8. Running the Test Suite
 
 The test suite runs with `pytest` against an isolated temporary SQLite database:
@@ -486,9 +606,9 @@ The test suite runs with `pytest` against an isolated temporary SQLite database:
 pytest -v
 ```
 
-Total tests: **82 passing** across 12 test modules:
+Total tests: **87 passing** across 13 test modules:
 - `test_auth.py` (11 tests): Registration, duplicate checks, login, JWT validation, expiration, user me.
-- `test_models.py` (8 tests): All 20 tables registered, foreign keys, unique & check constraints, relationships.
+- `test_models.py` (8 tests): All 24 tables registered, foreign keys, unique & check constraints, relationships.
 - `test_health.py` (1 test): Health check & database ping.
 - `test_organizations.py` (6 tests): Org CRUD, slug uniqueness, user org listing, invitations accept/reject, member removal.
 - `test_events.py` (6 tests): Event creation, draft visibility, publishing validation, public discovery filtering, cancelling.
@@ -499,3 +619,4 @@ Total tests: **82 passing** across 12 test modules:
 - `test_teams.py` (14 tests): Team creation, lifecycle status transitions, join codes, team discovery, roster privacy, invitations, role updates, ownership transfer, disbanding, and capacity enforcement.
 - `test_team_collaboration.py` (11 tests): Tasks CRUD, status transitions, assignees replacement, persistent chat, attachments, WebSocket authentication, real-time broadcasts, file validation, oversized rejections, and disconnects on leave/disband.
 - `test_projects_and_judging.py` (8 tests): Project creation, single project per team constraint, submission versions, draft editing, submitted immutability, deadline & team size checks, judge management, criteria immutability, evaluation lifecycle, conflict of interest checks, leaderboard dynamic calculation, ties, and access control.
+- `test_event_operations.py` (5 tests): Event schedule management, announcements & audience targeting, notifications privacy & unread tracking, check-in metrics & undo, mentor requests assignment & lifecycle.

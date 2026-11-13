@@ -1,5 +1,9 @@
+from app.models.announcement import Announcement
 from app.models.event import Event, EventMembership, EventTrack
+from app.models.event_schedule import EventScheduleItem
 from app.models.judging import Evaluation, EvaluationScore, JudgingCriteria
+from app.models.mentor_request import MentorRequest
+from app.models.notification import Notification
 from app.models.organization import Organization, OrganizationMember
 from app.models.project import Project, ProjectSubmission
 from app.models.stored_file import StoredFile
@@ -29,5 +33,9 @@ __all__ = [
     "JudgingCriteria",
     "Evaluation",
     "EvaluationScore",
+    "EventScheduleItem",
+    "Announcement",
+    "Notification",
+    "MentorRequest",
 ]
 

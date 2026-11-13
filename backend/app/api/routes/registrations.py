@@ -107,25 +107,3 @@ def update_participant(
     )
     return EventRegistrationResponse.model_validate(membership)
 
-
-@router.post(
-    "/events/{event_id}/participants/{user_id}/check-in",
-    response_model=EventRegistrationResponse,
-    status_code=status.HTTP_200_OK,
-    summary="Check in participant (Organizer)",
-)
-def check_in(
-    event_id: uuid.UUID,
-    user_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-) -> EventRegistrationResponse:
-    """Allow authorized organizers to mark a registered or approved participant as checked in."""
-    membership = check_in_participant(
-        db=db,
-        event_id=event_id,
-        participant_user_id=user_id,
-        current_user=current_user,
-    )
-    return EventRegistrationResponse.model_validate(membership)
-

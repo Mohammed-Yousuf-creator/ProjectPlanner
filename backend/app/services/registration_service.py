@@ -333,6 +333,12 @@ def check_in_participant(
             detail=f"Cannot check in participant with status '{membership.status}'. Only registered or approved participants can be checked in.",
         )
 
+    if membership.checked_in_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Participant is already checked in.",
+        )
+
     now = datetime.now(timezone.utc)
     membership.checked_in_at = now
     membership.updated_at = now

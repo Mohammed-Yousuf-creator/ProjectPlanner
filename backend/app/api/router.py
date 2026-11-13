@@ -1,11 +1,16 @@
 from fastapi import APIRouter
 
 from app.api.routes import (
+    announcements,
     auth,
+    checkins,
+    event_schedule,
     events,
     health,
     judging,
     leaderboards,
+    mentor_requests,
+    notifications,
     organizations,
     participants,
     projects,
@@ -37,3 +42,8 @@ api_router.include_router(projects.router, tags=["Projects"])
 api_router.include_router(submissions.router, tags=["Submissions"])
 api_router.include_router(judging.router, tags=["Judging"])
 api_router.include_router(leaderboards.router, tags=["Leaderboards"])
+api_router.include_router(event_schedule.router, tags=["Event Operations"])
+api_router.include_router(announcements.router, tags=["Event Operations"])
+api_router.include_router(notifications.router, tags=["Event Operations"])
+api_router.include_router(checkins.router, tags=["Event Operations"])
+api_router.include_router(mentor_requests.router, tags=["Event Operations"])
