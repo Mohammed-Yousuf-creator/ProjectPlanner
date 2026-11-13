@@ -57,6 +57,29 @@ from app.schemas.team import (
     TeamRead,
     TeamTransferOwnershipRequest,
 )
+from app.schemas.judging import (
+    EvaluationRead,
+    EvaluationSaveRequest,
+    EvaluationScoreItem,
+    EvaluationScoreRead,
+    JudgeCreate,
+    JudgeRead,
+    JudgingCriteriaCreate,
+    JudgingCriteriaRead,
+    JudgingCriteriaUpdate,
+    LeaderboardEntryRead,
+)
+from app.schemas.project import (
+    ProjectCreate,
+    ProjectDetailRead,
+    ProjectPublicRead,
+    ProjectRead,
+)
+from app.schemas.submission import (
+    ProjectSubmissionCreate,
+    ProjectSubmissionRead,
+    ProjectSubmissionUpdate,
+)
 from app.schemas.team_message import (
     TeamMessageCreateRequest,
     TeamMessageRead,
@@ -138,4 +161,21 @@ __all__ = [
     "TeamTaskUpdateRequest",
     "TeamTaskAssigneesUpdateRequest",
     "TeamTaskRead",
+    "ProjectCreate",
+    "ProjectRead",
+    "ProjectDetailRead",
+    "ProjectPublicRead",
+    "ProjectSubmissionCreate",
+    "ProjectSubmissionUpdate",
+    "ProjectSubmissionRead",
+    "JudgeCreate",
+    "JudgeRead",
+    "JudgingCriteriaCreate",
+    "JudgingCriteriaUpdate",
+    "JudgingCriteriaRead",
+    "EvaluationScoreItem",
+    "EvaluationScoreRead",
+    "EvaluationSaveRequest",
+    "EvaluationRead",
+    "LeaderboardEntryRead",
 ]

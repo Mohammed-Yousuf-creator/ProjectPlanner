@@ -12,7 +12,7 @@ from app.models.user import User, UserProfile
 
 
 def test_all_10_tables_registered():
-    """Verify that all 15 tables (10 foundation + 5 team collaboration) are registered with Base.metadata."""
+    """Verify that all 20 tables (10 foundation + 5 collaboration + 5 projects/judging) are registered with Base.metadata."""
     expected_tables = {
         "users",
         "user_profiles",
@@ -29,6 +29,11 @@ def test_all_10_tables_registered():
         "team_messages",
         "stored_files",
         "team_message_attachments",
+        "projects",
+        "project_submissions",
+        "judging_criteria",
+        "evaluations",
+        "evaluation_scores",
     }
     actual_tables = set(Base.metadata.tables.keys())
     assert actual_tables == expected_tables, f"Difference: {actual_tables.symmetric_difference(expected_tables)}"

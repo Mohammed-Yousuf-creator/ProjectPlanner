@@ -7,6 +7,7 @@ This repository contains the backend for an event and hackathon management platf
 - **Phase 3:** Participant Registration, Dashboard, and Organizer Participant Management.
 - **Phase 4:** Team Formation and Membership Management.
 - **Phase 5:** Team Collaboration (task boards, multi-assignee task management, persistent team chat, WebSockets real-time updates, and local image/video storage).
+- **Phase 6:** Projects, Submission Versions, Judging Criteria, Evaluations, and Leaderboards.
 
 ---
 
@@ -46,7 +47,11 @@ backend/
 │   │       ├── teams.py         # /api/v1/events/{event_id}/teams, /api/v1/teams/*, /api/v1/team-invitations/*
 │   │       ├── team_tasks.py    # /api/v1/teams/{team_id}/tasks/*
 │   │       ├── team_messages.py # /api/v1/teams/{team_id}/messages/* and WebSocket /ws
-│   │       └── team_files.py    # /api/v1/teams/{team_id}/files/*
+│   │       ├── team_files.py    # /api/v1/teams/{team_id}/files/*
+│   │       ├── projects.py      # /api/v1/events/{event_id}/projects, /api/v1/teams/{team_id}/project
+│   │       ├── submissions.py   # /api/v1/projects/{project_id}/submissions/*
+│   │       ├── judging.py       # /api/v1/events/{event_id}/judges, judging-criteria, evaluations
+│   │       └── leaderboards.py  # /api/v1/events/{event_id}/leaderboard
 │   ├── core/
 │   │   ├── __init__.py
 │   │   ├── config.py            # Pydantic-settings configuration & .env loading
@@ -58,14 +63,16 @@ backend/
 │   │   ├── base.py              # DeclarativeBase & UTCDateTime TypeDecorator
 │   │   └── session.py           # SQLite connection, engine & SessionLocal factory
 │   ├── models/
-│   │   ├── __init__.py          # Exports and registers all 15 models with Base
+│   │   ├── __init__.py          # Exports and registers all 20 models with Base
 │   │   ├── user.py              # User and UserProfile models
 │   │   ├── organization.py      # Organization and OrganizationMember models
 │   │   ├── event.py             # Event, EventMembership, EventTrack models
 │   │   ├── team.py              # Team, TeamMember, TeamInvitation models
 │   │   ├── team_task.py         # TeamTask and TeamTaskAssignee models
 │   │   ├── team_message.py      # TeamMessage and TeamMessageAttachment models
-│   │   └── stored_file.py       # StoredFile model
+│   │   ├── stored_file.py       # StoredFile model
+│   │   ├── project.py           # Project and ProjectSubmission models
+│   │   └── judging.py           # JudgingCriteria, Evaluation, EvaluationScore models
 │   ├── schemas/
 │   │   ├── __init__.py          # Pydantic schema exports
 │   │   ├── auth.py              # RegisterRequest, LoginRequest, AuthResponse, TokenResponse
@@ -77,7 +84,10 @@ backend/
 │   │   ├── team.py              # TeamCreate, TeamRead, TeamMember*, TeamInvitation*
 │   │   ├── team_task.py         # TeamTaskCreateRequest, TeamTaskRead, TeamTaskAssigneesUpdateRequest
 │   │   ├── team_message.py      # TeamMessageCreateRequest, TeamMessageRead, TeamMessageUpdateRequest
-│   │   └── stored_file.py       # StoredFileRead
+│   │   ├── stored_file.py       # StoredFileRead
+│   │   ├── project.py           # ProjectCreate, ProjectRead, ProjectDetailRead, ProjectPublicRead
+│   │   ├── submission.py        # ProjectSubmissionCreate, ProjectSubmissionUpdate, ProjectSubmissionRead
+│   │   └── judging.py           # Judge*, JudgingCriteria*, Evaluation*, LeaderboardEntryRead
 │   ├── services/
 │   │   ├── __init__.py
 │   │   ├── auth_service.py         # Registration & authentication business logic
@@ -88,7 +98,11 @@ backend/
 │   │   ├── team_service.py         # Team creation, discovery, join codes, invitations, and membership management
 │   │   ├── team_task_service.py    # Team tasks, assignment list updates, status transitions, position ordering
 │   │   ├── team_chat_service.py    # Persistent messaging, safe attachments, edit, and soft-delete
-│   │   └── file_service.py         # Image/video uploads, streaming validation, safe download responses
+│   │   ├── file_service.py         # Image/video uploads, streaming validation, safe download responses
+│   │   ├── project_service.py      # Project creation, team scoping, public discovery
+│   │   ├── submission_service.py   # Versioned submissions, drafts, deadline validation, immutability
+│   │   ├── judging_service.py      # Judge management, criteria configuration, draft & submitted evaluations
+│   │   └── leaderboard_service.py  # Dynamic weighted score calculation, ties, and access control
 │   └── storage/
 │       ├── __init__.py
 │       └── local_storage.py        # Local disk storage provider with chunked streaming and Pillow validation
@@ -409,6 +423,61 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 
 ---
 
+### Phase 6: Projects, Submissions, Judging & Leaderboards
+
+#### Project Management
+- **`POST /api/v1/events/{event_id}/projects`**:
+  - Create a team project and its first draft submission (`version_number = 1`) in a single transaction.
+  - Restricted to active team owners or leads. One project per team per event.
+  - Validates optional event track and HTTP(S) links.
+- **`GET /api/v1/teams/{team_id}/project`**:
+  - Returns the team's project, latest submission, and full submission history (including drafts). Restricted to active team members.
+- **`GET /api/v1/events/{event_id}/projects`**:
+  - Public discovery listing submitted projects for participants, judges, or organizers. Never exposes draft submissions. Supports pagination.
+
+#### Submission Versions & Immutability
+- **`PATCH /api/v1/projects/{project_id}/submissions/{submission_id}`**:
+  - Edit draft submission details. Modifying a submitted version returns `HTTP 409 Conflict`.
+- **`POST /api/v1/projects/{project_id}/submissions`**:
+  - Create the next submission version. Requires previous version to be submitted; rejects duplicate drafts. Copies previous data as draft template.
+- **`GET /api/v1/projects/{project_id}/submissions`**:
+  - Return version history. Team members and organizers view all versions; judges view submitted versions only.
+- **`POST /api/v1/projects/{project_id}/submissions/{submission_id}/submit`**:
+  - Finalize a submission before the event deadline.
+  - Enforces required title, abstract, valid HTTP(S) repository URL, and event minimum team size.
+  - Sets submission to `submitted` (immutable) and marks team status as `submitted` (blocking new members from joining).
+
+#### Judge & Criteria Management
+- **`POST /api/v1/events/{event_id}/judges`**: Add an existing user as an approved event judge. Enforces participant/judge exclusivity.
+- **`GET /api/v1/events/{event_id}/judges`**: List judges for authorized event organizers.
+- **`DELETE /api/v1/events/{event_id}/judges/{user_id}`**: Remove judging access by setting membership status to `withdrawn`. Existing evaluations are preserved.
+- **`POST /api/v1/events/{event_id}/judging-criteria`**: Create criteria with `max_score > 0` and `weight > 0`.
+- **`GET /api/v1/events/{event_id}/judging-criteria`**: Active criteria visible to participants and judges; all criteria visible to organizers.
+- **`PATCH /api/v1/judging-criteria/{criterion_id}`**: Update criterion. Blocked if evaluations have already begun for the event.
+- **`DELETE /api/v1/judging-criteria/{criterion_id}`**: Delete criterion. Blocked if evaluations have already begun.
+
+#### Evaluation System
+- **`POST /api/v1/submissions/{submission_id}/evaluations`**:
+  - Create a draft evaluation for an approved judge. Rejects drafts or superseded submission versions.
+  - Conflict of interest prevention: judges cannot evaluate projects from teams they currently or previously belonged to.
+- **`GET /api/v1/submissions/{submission_id}/evaluations/me`**: Return judge's own evaluation and scores.
+- **`PUT /api/v1/evaluations/{evaluation_id}`**: Save or update draft evaluation scores. Allows incomplete drafts.
+- **`POST /api/v1/evaluations/{evaluation_id}/submit`**:
+  - Finalize evaluation. Every active criterion must be scored within its `[0, max_score]` range.
+  - Submitted evaluations become immutable (`HTTP 409 Conflict` on edit attempts).
+
+#### Dynamic Leaderboard
+- **`GET /api/v1/events/{event_id}/leaderboard`**:
+  - Dynamically calculates scores using the formula:
+    - Normalized score: `(score / max_score) * 100`
+    - Judge weighted score: `sum(normalized_score * weight) / sum(weight)`
+    - Final project score: `average(weighted_score across submitted evaluations)`
+  - Standard competition ranking handling ties with equal ranks.
+  - Unjudged projects receive no invented scores (`final_score = None`, `rank = None`).
+  - Access control: Organizers view anytime; participants and public view only after event completion.
+
+---
+
 ## 8. Running the Test Suite
 
 The test suite runs with `pytest` against an isolated temporary SQLite database:
@@ -417,9 +486,9 @@ The test suite runs with `pytest` against an isolated temporary SQLite database:
 pytest -v
 ```
 
-Total tests: **74 passing** across 11 test modules:
+Total tests: **82 passing** across 12 test modules:
 - `test_auth.py` (11 tests): Registration, duplicate checks, login, JWT validation, expiration, user me.
-- `test_models.py` (8 tests): All 15 tables registered, foreign keys, unique & check constraints, relationships.
+- `test_models.py` (8 tests): All 20 tables registered, foreign keys, unique & check constraints, relationships.
 - `test_health.py` (1 test): Health check & database ping.
 - `test_organizations.py` (6 tests): Org CRUD, slug uniqueness, user org listing, invitations accept/reject, member removal.
 - `test_events.py` (6 tests): Event creation, draft visibility, publishing validation, public discovery filtering, cancelling.
@@ -429,3 +498,4 @@ Total tests: **74 passing** across 11 test modules:
 - `test_organizer_participants.py` (3 tests): Organizer participant roster, search/filter, status updates, check-in.
 - `test_teams.py` (14 tests): Team creation, lifecycle status transitions, join codes, team discovery, roster privacy, invitations, role updates, ownership transfer, disbanding, and capacity enforcement.
 - `test_team_collaboration.py` (11 tests): Tasks CRUD, status transitions, assignees replacement, persistent chat, attachments, WebSocket authentication, real-time broadcasts, file validation, oversized rejections, and disconnects on leave/disband.
+- `test_projects_and_judging.py` (8 tests): Project creation, single project per team constraint, submission versions, draft editing, submitted immutability, deadline & team size checks, judge management, criteria immutability, evaluation lifecycle, conflict of interest checks, leaderboard dynamic calculation, ties, and access control.

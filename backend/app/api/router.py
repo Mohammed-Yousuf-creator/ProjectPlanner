@@ -4,9 +4,13 @@ from app.api.routes import (
     auth,
     events,
     health,
+    judging,
+    leaderboards,
     organizations,
     participants,
+    projects,
     registrations,
+    submissions,
     team_files,
     team_messages,
     team_tasks,
@@ -29,3 +33,7 @@ api_router.include_router(teams.router, tags=["Teams"])
 api_router.include_router(team_tasks.router, tags=["Team Collaboration"])
 api_router.include_router(team_messages.router, tags=["Team Collaboration"])
 api_router.include_router(team_files.router, tags=["Team Collaboration"])
+api_router.include_router(projects.router, tags=["Projects"])
+api_router.include_router(submissions.router, tags=["Submissions"])
+api_router.include_router(judging.router, tags=["Judging"])
+api_router.include_router(leaderboards.router, tags=["Leaderboards"])

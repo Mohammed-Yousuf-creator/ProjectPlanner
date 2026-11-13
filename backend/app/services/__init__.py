@@ -35,6 +35,31 @@ from app.services.registration_service import (
     update_participant_status,
     withdraw_registration,
 )
+from app.services.judging_service import (
+    add_event_judge,
+    create_draft_evaluation,
+    create_judging_criteria,
+    delete_judging_criteria,
+    finalize_evaluation,
+    get_my_evaluation,
+    list_event_judges,
+    list_judging_criteria,
+    remove_event_judge,
+    save_draft_evaluation,
+    update_judging_criteria,
+)
+from app.services.leaderboard_service import get_event_leaderboard
+from app.services.project_service import (
+    create_project,
+    get_team_project,
+    list_event_projects,
+)
+from app.services.submission_service import (
+    create_next_submission_version,
+    edit_draft_submission,
+    finalize_submission,
+    get_project_submissions,
+)
 from app.services.file_service import download_team_file, upload_team_file
 from app.services.team_chat_service import (
     create_message,
@@ -124,4 +149,23 @@ __all__ = [
     "list_messages",
     "edit_message",
     "soft_delete_message",
+    "create_project",
+    "get_team_project",
+    "list_event_projects",
+    "edit_draft_submission",
+    "create_next_submission_version",
+    "get_project_submissions",
+    "finalize_submission",
+    "add_event_judge",
+    "list_event_judges",
+    "remove_event_judge",
+    "create_judging_criteria",
+    "list_judging_criteria",
+    "update_judging_criteria",
+    "delete_judging_criteria",
+    "create_draft_evaluation",
+    "get_my_evaluation",
+    "save_draft_evaluation",
+    "finalize_evaluation",
+    "get_event_leaderboard",
 ]

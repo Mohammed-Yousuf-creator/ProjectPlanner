@@ -16,6 +16,7 @@ from app.db.base import Base, UTCDateTime
 
 if TYPE_CHECKING:
     from app.models.event import Event
+    from app.models.project import Project
     from app.models.stored_file import StoredFile
     from app.models.team_message import TeamMessage
     from app.models.team_task import TeamTask
@@ -90,6 +91,11 @@ class Team(Base):
     )
     files: Mapped[List["StoredFile"]] = relationship(
         "StoredFile",
+        back_populates="team",
+        cascade="all, delete-orphan",
+    )
+    projects: Mapped[List["Project"]] = relationship(
+        "Project",
         back_populates="team",
         cascade="all, delete-orphan",
     )

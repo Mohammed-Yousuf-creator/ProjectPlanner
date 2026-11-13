@@ -17,7 +17,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base, UTCDateTime
 
 if TYPE_CHECKING:
+    from app.models.judging import JudgingCriteria
     from app.models.organization import Organization
+    from app.models.project import Project
     from app.models.team import Team
     from app.models.user import User
 
@@ -133,6 +135,16 @@ class Event(Base):
     )
     teams: Mapped[List["Team"]] = relationship(
         "Team",
+        back_populates="event",
+        cascade="all, delete-orphan",
+    )
+    projects: Mapped[List["Project"]] = relationship(
+        "Project",
+        back_populates="event",
+        cascade="all, delete-orphan",
+    )
+    judging_criteria: Mapped[List["JudgingCriteria"]] = relationship(
+        "JudgingCriteria",
         back_populates="event",
         cascade="all, delete-orphan",
     )
