@@ -1,8 +1,9 @@
-# Event & Hackathon Management Platform - Backend Foundation
+# Event & Hackathon Management Platform - Backend
 
-This repository contains the backend foundation for an event and hackathon management platform built with Python, FastAPI, SQLite, and SQLAlchemy 2.x.
+This repository contains the backend for an event and hackathon management platform built with Python, FastAPI, SQLite, and SQLAlchemy 2.x.
 
-This initial phase establishes the core database architecture, declarative models, Pydantic schemas, migration pipeline with Alembic, JWT access-token authentication with Argon2 password hashing, and test suite.
+Phase 1 established the foundation (database architecture, 10 models, Pydantic schemas, Alembic migrations, JWT access tokens, Argon2 password hashing).
+Phase 2 implements **Organizations, Event Management, Public Event Discovery, and Event Tracks**.
 
 ---
 
@@ -33,12 +34,15 @@ backend/
 │   │       ├── __init__.py
 │   │       ├── auth.py          # /api/v1/auth/register and /api/v1/auth/login
 │   │       ├── users.py         # /api/v1/users/me
-│   │       └── health.py        # /api/v1/health
+│   │       ├── health.py        # /api/v1/health
+│   │       ├── organizations.py # /api/v1/organizations/*
+│   │       ├── events.py        # /api/v1/events/*
+│   │       └── tracks.py        # /api/v1/tracks/*
 │   ├── core/
 │   │   ├── __init__.py
 │   │   ├── config.py            # Pydantic-settings configuration & .env loading
 │   │   ├── security.py          # Argon2 hashing & PyJWT token utilities
-│   │   └── dependencies.py      # FastAPI reusable dependencies (get_current_user)
+│   │   └── dependencies.py      # get_current_user & get_optional_current_user
 │   ├── db/
 │   │   ├── __init__.py
 │   │   ├── base.py              # DeclarativeBase & UTCDateTime TypeDecorator
@@ -53,12 +57,14 @@ backend/
 │   │   ├── __init__.py          # Pydantic schema exports
 │   │   ├── auth.py              # RegisterRequest, LoginRequest, AuthResponse, TokenResponse
 │   │   ├── user.py              # UserRead, UserProfileRead, UserProfileUpdate, UserMeResponse
-│   │   ├── organization.py      # OrganizationCreate, OrganizationRead, OrganizationMemberRead
-│   │   ├── event.py             # EventCreate, EventUpdate, EventRead, EventMembership*, EventTrack*
+│   │   ├── organization.py      # OrganizationCreate, OrganizationUpdate, OrganizationRead, Member schemas
+│   │   ├── event.py             # EventCreate, EventUpdate, EventRead, EventTrack schemas
 │   │   └── team.py              # TeamCreate, TeamRead, TeamMember*, TeamInvitation*
 │   └── services/
 │       ├── __init__.py
-│       └── auth_service.py      # Registration & authentication business logic
+│       ├── auth_service.py         # Registration & authentication business logic
+│       ├── organization_service.py # Organization & membership authorization & business logic
+│       └── event_service.py        # Event lifecycle, publishing, filtering & track logic
 ├── alembic/
 │   ├── versions/                # Generated database migration files
 │   ├── env.py                   # Alembic environment configured with app settings & models
@@ -71,7 +77,10 @@ backend/
 │   ├── conftest.py              # Pytest fixtures, test database setup, and TestClient
 │   ├── test_auth.py             # Authentication & user endpoint tests
 │   ├── test_health.py           # Health check & DB connectivity tests
-│   └── test_models.py           # All 10 models, constraints, and relationship tests
+│   ├── test_models.py           # All 10 models, constraints, and relationship tests
+│   ├── test_organizations.py    # Organization CRUD, roles, and invitation tests
+│   ├── test_events.py           # Event lifecycle, draft visibility, publishing tests
+│   └── test_tracks.py           # Event track creation, update, and deletion tests
 ├── .env                         # Local environment settings (ignored by git)
 ├── .env.example                 # Example environment template
 ├── .gitignore                   # Git ignore patterns
@@ -84,7 +93,7 @@ backend/
 
 ## 3. Database Architecture & Models
 
-The foundation defines exactly 10 relational tables:
+The system defines 10 relational tables:
 
 1. **`users`**: Central account table. Holds UUID, unique normalized email, unique normalized username, Argon2 password hash, account status, email verification timestamp, and UTC audit timestamps.
 2. **`user_profiles`**: One-to-one child record created automatically upon user registration with display name, bio, social links, and visibility settings.
@@ -96,11 +105,6 @@ The foundation defines exactly 10 relational tables:
 8. **`teams`**: Teams formed for a specific event with unique constraint on `(event_id, name)` and join code hash support.
 9. **`team_members`**: Membership of users in teams with unique constraint on `(team_id, user_id)`, role checks (`owner`, `lead`, `member`), and status checks (`active`, `left`).
 10. **`team_invitations`**: Pending invitations with database-level check constraint guaranteeing exactly one invite target (`(invitee_user_id IS NOT NULL AND invitee_email IS NULL) OR (invitee_user_id IS NULL AND invitee_email IS NOT NULL)`), code hash, and status checks.
-
-### Key Database Conventions:
-- **UUIDs**: All primary keys and foreign keys use UUIDs via `sqlalchemy.Uuid(as_uuid=True)`.
-- **Foreign Keys**: Enabled across SQLite connections via `PRAGMA foreign_keys=ON` SQLAlchemy event listeners.
-- **UTC Timestamps**: Timestamps are stored in UTC. The custom `UTCDateTime` TypeDecorator attaches UTC timezone information upon loading from SQLite to ensure correct serialization.
 
 ---
 
@@ -151,27 +155,9 @@ JWT_AUDIENCE=event-platform-users
 
 ## 5. Running Database Migrations
 
-Alembic manages all schema creation and future evolutions. Do not call `Base.metadata.create_all()` in production code.
-
-### Apply Migrations to SQLite
+Alembic manages all schema creation and evolutions:
 
 ```bash
-alembic upgrade head
-```
-
-This creates `data/app.db` and applies all 10 tables and constraints.
-
-### How to Generate a New Migration After Changing Models
-
-When you add or modify SQLAlchemy models in `app/models/`:
-
-```bash
-# Autogenerate migration script
-alembic revision --autogenerate -m "describe_your_changes"
-
-# Review the generated file in alembic/versions/
-
-# Apply migration
 alembic upgrade head
 ```
 
@@ -191,86 +177,117 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 
 ---
 
-## 7. API Endpoints
+## 7. API Endpoints Documentation
 
 ### Health Check
-
-- **`GET /api/v1/health`**
-  - Verifies service operational status and database connection.
-  - Returns `{"status": "ok", "app_name": "...", "environment": "...", "database": "connected"}`.
+- **`GET /api/v1/health`**: Verifies service operational status and database connection.
 
 ### Authentication
+- **`POST /api/v1/auth/register`**: Register a new user and automatically create their user profile.
+- **`POST /api/v1/auth/login`**: Authenticate with email/password and receive a JWT access token.
+- **`GET /api/v1/users/me`**: Return authenticated user information and profile.
 
-- **`POST /api/v1/auth/register`**
-  - **Request Body (`RegisterRequest`):**
-    ```json
-    {
-      "email": "user@example.com",
-      "username": "coder",
-      "password": "SecurePassword123!",
-      "display_name": "Jane Coder"
-    }
-    ```
-  - **Response (`AuthResponse` - 201 Created):**
-    ```json
-    {
-      "access_token": "eyJhbGciOiJIUzI1Ni...",
-      "token_type": "bearer",
-      "user": {
-        "id": "c1f...",
-        "email": "user@example.com",
-        "username": "coder",
-        "account_status": "active",
-        "email_verified_at": null,
-        "created_at": "2026-11-13T16:00:00Z",
-        "updated_at": "2026-11-13T16:00:00Z",
-        "profile": {
-          "display_name": "Jane Coder",
-          "profile_visibility": "public"
-        }
-      }
-    }
-    ```
+### Organizations Management
+- **`POST /api/v1/organizations`**:
+  - Authenticated users only.
+  - Creator is automatically assigned as `owner` in `organization_members` in a single transaction.
+  - Allowed types: `organizer`, `sponsor`, `both`, `other`.
+- **`GET /api/v1/organizations/mine`**:
+  - Return all organizations the authenticated user belongs to.
+  - Includes user's `my_role` (`owner`, `admin`, `member`), `my_status`, and `my_joined_at`.
+- **`GET /api/v1/organizations/{organization_id}`**:
+  - Private organization details accessible only to active organization members.
+- **`PATCH /api/v1/organizations/{organization_id}`**:
+  - Update organization information.
+  - Authorized for organization `owner` and `admin` only.
+- **`GET /api/v1/organizations/{organization_id}/members`**:
+  - Return active members of the organization with user profile details.
+  - Restricted to active organization members.
+- **`POST /api/v1/organizations/{organization_id}/members/invitations`**:
+  - Invite an existing registered user via email as `admin` or `member` (cannot invite as `owner`).
+  - Restricted to organization `owner` and `admin`.
+  - Creates membership with status `invited`.
+- **`POST /api/v1/organizations/{organization_id}/members/invitations/{membership_id}/accept`**:
+  - Invited user accepts their pending invitation.
+  - Restricted to the invited user matching `current_user.id`.
+- **`POST /api/v1/organizations/{organization_id}/members/invitations/{membership_id}/reject`**:
+  - Invited user rejects their pending invitation.
+- **`DELETE /api/v1/organizations/{organization_id}/members/{user_id}`**:
+  - Remove an organization member.
+  - Authorized for `owner` and `admin`.
+  - Admins cannot remove owners.
+  - The last remaining owner cannot be removed.
 
-- **`POST /api/v1/auth/login`**
-  - **Request Body (`LoginRequest`):**
-    ```json
-    {
-      "email": "user@example.com",
-      "password": "SecurePassword123!"
-    }
-    ```
-  - **Response (`TokenResponse` - 200 OK):**
-    ```json
-    {
-      "access_token": "eyJhbGciOiJIUzI1Ni...",
-      "token_type": "bearer"
-    }
-    ```
+### Event Management
+- **`POST /api/v1/organizations/{organization_id}/events`**:
+  - Create an event.
+  - Authorized for organization `owner` and `admin`.
+  - Organization must be of type `organizer` or `both`.
+  - Automatically assigns `created_by_user_id = current_user.id`.
+  - Events start with status `draft`.
+  - Validates dates (`ends_at > starts_at`, `registration_closes_at > registration_opens_at`, etc.) and team size bounds (`max_team_size >= min_team_size >= 1`).
+- **`GET /api/v1/organizations/{organization_id}/events`**:
+  - List all events under an organization including drafts.
+  - Restricted to active organization members.
+- **`GET /api/v1/events/{event_id}`**:
+  - Public visitors can access published events with `public` visibility.
+  - Drafts and private events are accessible only to active organization members.
+- **`PATCH /api/v1/events/{event_id}`**:
+  - Update event details.
+  - Authorized for organization `owner` and `admin`.
+- **`POST /api/v1/events/{event_id}/publish`**:
+  - Publish draft event (`status = "published"`).
+  - Only draft events can be published.
+  - Validates required fields (`starts_at`, `ends_at`, `timezone`, `format`, venue/city for offline/hybrid).
+  - Authorized for organization `owner` and `admin`.
+- **`POST /api/v1/events/{event_id}/cancel`**:
+  - Cancel event (`status = "cancelled"`).
+  - Cancelled events cannot be re-published without future restoration flow.
+  - Authorized for organization `owner` and `admin`.
 
-### User Information
+### Public Event Discovery
+- **`GET /api/v1/events`**:
+  - Return publicly visible published events (`status = 'published'`, `visibility = 'public'`).
+  - Drafts, private, and cancelled events are never exposed.
+  - Query parameters:
+    - `event_type`: filter by type (e.g. `hackathon`)
+    - `format`: filter by format (`online`, `offline`, `hybrid`)
+    - `city`: filter by city (case-insensitive)
+    - `limit`: default 20 (max 100)
+    - `offset`: default 0
 
-- **`GET /api/v1/users/me`**
-  - **Headers:** `Authorization: Bearer <access_token>`
-  - **Response (`UserMeResponse` - 200 OK):** Returns current user information and profile. Rejects inactive or suspended accounts.
-
-### Authentication Design Notes & Logout Limitation
-- Passwords are encrypted with **Argon2** via `pwdlib`.
-- Access tokens are stateless JWTs signed with **HS256** expiring after 30 minutes. Claims include `sub`, `iat`, `exp`, `jti`, `iss`, `aud`.
-- **Logout limitation:** In this foundation phase, there is no server-side token revocation or session blacklist. Clients log out by discarding the access token. A copied access token remains valid until its 30-minute expiration window expires.
+### Event Tracks
+- **`POST /api/v1/events/{event_id}/tracks`**:
+  - Create track for an event.
+  - Prevents duplicate track names within the event.
+  - Authorized for organization `owner` and `admin`.
+- **`GET /api/v1/events/{event_id}/tracks`**:
+  - List tracks for an event.
+  - Inherits event visibility permissions.
+- **`PATCH /api/v1/tracks/{track_id}`**:
+  - Update track name and description.
+  - Authorized for organization `owner` and `admin`.
+- **`DELETE /api/v1/tracks/{track_id}`**:
+  - Delete track.
+  - Authorized for organization `owner` and `admin`.
 
 ---
 
-## 8. Running the Test Suite
+## 8. Authorization & IDOR Protection
 
-The test suite runs with `pytest` using an isolated temporary SQLite database file per test. It does not modify or delete the local development database `data/app.db`.
+1. **Authentication:** Uses validated Bearer JWT tokens. Current user identity is always retrieved from JWT `sub`, never from user-supplied IDs or headers.
+2. **Organization Isolation:** Operations verify that records belong to the organization specified in the route before inspecting or modifying data.
+3. **Role Checks:** Owner and admin permissions are enforced server-side against the database for every protected operation.
+4. **Event Visibility:** Published public events are open; draft and private events are hidden from unauthorized visitors and only accessible to verified active organization members.
+
+---
+
+## 9. Running the Test Suite
+
+The test suite runs with `pytest` against an isolated temporary SQLite database:
 
 ```bash
 pytest -v
 ```
 
-### Test Coverage Highlights:
-- **Authentication:** Registration, normalization, duplicate email/username rejection, Argon2 password hashing verification, login verification, bad password rejection, invalid token rejection, expired token rejection, suspended account rejection.
-- **Database Models & Constraints:** All 10 tables registered, SQLite foreign key enforcement, unique constraints, check constraints (event format, event team sizes, team invitation XOR target), one-to-one user profile relationship with cascade delete, and event/team/organization relational integrity.
-- **Service Health:** Live database connectivity check via `/api/v1/health`.
-
+Total tests: 35 passing (authentication, models, constraints, organizations, events, tracks, health check).

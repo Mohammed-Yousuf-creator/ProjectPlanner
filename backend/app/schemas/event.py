@@ -2,13 +2,17 @@ import uuid
 from datetime import datetime
 from typing import Any, Dict, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class EventCreate(BaseModel):
-    organization_id: uuid.UUID
     name: str = Field(min_length=2, max_length=200)
-    slug: str = Field(min_length=2, max_length=100, pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+    slug: Optional[str] = Field(
+        default=None,
+        min_length=2,
+        max_length=100,
+        pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$",
+    )
     short_description: Optional[str] = Field(default=None, max_length=500)
     description: Optional[str] = None
     event_type: str = Field(min_length=2, max_length=50)
@@ -27,23 +31,33 @@ class EventCreate(BaseModel):
     min_team_size: int = Field(default=1, ge=1)
     max_team_size: int = Field(default=4, ge=1)
 
+    @model_validator(mode="after")
+    def validate_dates_and_team_sizes(self) -> "EventCreate":
+        if self.max_team_size < self.min_team_size:
+            raise ValueError("max_team_size must be greater than or equal to min_team_size")
+        if self.starts_at and self.ends_at and self.ends_at <= self.starts_at:
+            raise ValueError("Event ends_at must be strictly after starts_at")
+        if (
+            self.registration_opens_at
+            and self.registration_closes_at
+            and self.registration_closes_at <= self.registration_opens_at
+        ):
+            raise ValueError("registration_closes_at must be after registration_opens_at")
+        return self
+
 
 class EventUpdate(BaseModel):
     name: Optional[str] = Field(default=None, min_length=2, max_length=200)
+    slug: Optional[str] = Field(
+        default=None,
+        min_length=2,
+        max_length=100,
+        pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$",
+    )
     short_description: Optional[str] = Field(default=None, max_length=500)
     description: Optional[str] = None
     event_type: Optional[str] = Field(default=None, min_length=2, max_length=50)
     format: Optional[Literal["online", "offline", "hybrid"]] = None
-    status: Optional[
-        Literal[
-            "draft",
-            "published",
-            "registration_open",
-            "in_progress",
-            "completed",
-            "cancelled",
-        ]
-    ] = None
     visibility: Optional[Literal["public", "private", "unlisted"]] = None
     starts_at: Optional[datetime] = None
     ends_at: Optional[datetime] = None
@@ -111,8 +125,12 @@ class EventMembershipRead(BaseModel):
 
 
 class EventTrackCreate(BaseModel):
-    event_id: uuid.UUID
     name: str = Field(min_length=1, max_length=150)
+    description: Optional[str] = None
+
+
+class EventTrackUpdate(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=1, max_length=150)
     description: Optional[str] = None
 
 
@@ -124,4 +142,3 @@ class EventTrackRead(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
-

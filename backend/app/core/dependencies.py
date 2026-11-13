@@ -72,3 +72,32 @@ def get_current_user(
 
     return user
 
+
+def get_optional_current_user(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
+    db: Session = Depends(get_db),
+) -> Optional[User]:
+    """Retrieve current user if valid Bearer token is present, else None without raising 401."""
+    if credentials is None or not credentials.credentials:
+        return None
+
+    token = credentials.credentials
+    try:
+        payload = decode_access_token(token)
+        sub = payload.get("sub")
+        if not sub:
+            return None
+        user_id = uuid.UUID(sub)
+    except Exception:
+        return None
+
+    user = db.execute(
+        select(User)
+        .options(selectinload(User.profile))
+        .where(User.id == user_id)
+    ).scalar_one_or_none()
+
+    if user is None or user.account_status != "active":
+        return None
+
+    return user
