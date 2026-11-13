@@ -1,0 +1,31 @@
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Pytest & test caches
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Environment files
+.env
+
+# SQLite databases & temp files
+data/*.db
+data/*.db-journal
+data/*.db-wal
+data/*.db-shm
+
+# Build & packaging
+*.egg-info/
+dist/
+build/
+.mypy_cache/
+
