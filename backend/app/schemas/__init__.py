@@ -23,6 +23,20 @@ from app.schemas.organization import (
     OrganizationUpdate,
     OrganizationWithMyRoleRead,
 )
+from app.schemas.participant import (
+    ParticipantDashboardResponse,
+    ParticipantEventItem,
+    ParticipantRegisteredEventDetail,
+    ParticipantRegistrationRead,
+    ParticipantSummary,
+    ParticipantUserInfo,
+)
+from app.schemas.registration import (
+    EventRegisterRequest,
+    EventRegistrationResponse,
+    OrganizerParticipantRead,
+    ParticipantStatusUpdateRequest,
+)
 from app.schemas.team import (
     TeamCreate,
     TeamInvitationCreate,
@@ -62,6 +76,16 @@ __all__ = [
     "EventTrackCreate",
     "EventTrackUpdate",
     "EventTrackRead",
+    "EventRegisterRequest",
+    "EventRegistrationResponse",
+    "ParticipantStatusUpdateRequest",
+    "OrganizerParticipantRead",
+    "ParticipantRegistrationRead",
+    "ParticipantUserInfo",
+    "ParticipantSummary",
+    "ParticipantEventItem",
+    "ParticipantDashboardResponse",
+    "ParticipantRegisteredEventDetail",
     "TeamCreate",
     "TeamRead",
     "TeamMemberRead",

@@ -23,6 +23,18 @@ from app.services.organization_service import (
     remove_member,
     update_organization,
 )
+from app.services.participant_service import (
+    get_participant_dashboard,
+    get_registered_event_detail,
+    list_my_registrations,
+)
+from app.services.registration_service import (
+    check_in_participant,
+    list_event_participants,
+    register_for_event,
+    update_participant_status,
+    withdraw_registration,
+)
 
 __all__ = [
     "register_user",
@@ -47,4 +59,12 @@ __all__ = [
     "get_event_tracks",
     "update_track",
     "delete_track",
+    "register_for_event",
+    "withdraw_registration",
+    "list_event_participants",
+    "update_participant_status",
+    "check_in_participant",
+    "list_my_registrations",
+    "get_participant_dashboard",
+    "get_registered_event_detail",
 ]
