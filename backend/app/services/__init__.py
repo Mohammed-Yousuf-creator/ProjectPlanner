@@ -35,6 +35,21 @@ from app.services.registration_service import (
     update_participant_status,
     withdraw_registration,
 )
+from app.services.file_service import download_team_file, upload_team_file
+from app.services.team_chat_service import (
+    create_message,
+    edit_message,
+    list_messages,
+    soft_delete_message,
+)
+from app.services.team_task_service import (
+    create_task,
+    delete_task,
+    get_task_details,
+    list_tasks,
+    update_task,
+    update_task_assignees,
+)
 from app.services.team_service import (
     accept_team_invitation,
     create_team,
@@ -97,4 +112,16 @@ __all__ = [
     "update_team_member_role",
     "transfer_team_ownership",
     "disband_team",
+    "upload_team_file",
+    "download_team_file",
+    "create_task",
+    "list_tasks",
+    "get_task_details",
+    "update_task",
+    "delete_task",
+    "update_task_assignees",
+    "create_message",
+    "list_messages",
+    "edit_message",
+    "soft_delete_message",
 ]

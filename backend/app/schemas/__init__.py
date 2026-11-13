@@ -37,6 +37,7 @@ from app.schemas.registration import (
     OrganizerParticipantRead,
     ParticipantStatusUpdateRequest,
 )
+from app.schemas.stored_file import StoredFileRead
 from app.schemas.team import (
     TeamCreate,
     TeamCreateRequest,
@@ -55,6 +56,19 @@ from app.schemas.team import (
     TeamMemberRoleUpdateRequest,
     TeamRead,
     TeamTransferOwnershipRequest,
+)
+from app.schemas.team_message import (
+    TeamMessageCreateRequest,
+    TeamMessageRead,
+    TeamMessageSenderInfo,
+    TeamMessageUpdateRequest,
+)
+from app.schemas.team_task import (
+    TeamTaskAssigneeRead,
+    TeamTaskAssigneesUpdateRequest,
+    TeamTaskCreateRequest,
+    TeamTaskRead,
+    TeamTaskUpdateRequest,
 )
 from app.schemas.user import (
     UserMeResponse,
@@ -114,4 +128,14 @@ __all__ = [
     "TeamInvitationRespond",
     "TeamMemberRoleUpdateRequest",
     "TeamTransferOwnershipRequest",
+    "StoredFileRead",
+    "TeamMessageSenderInfo",
+    "TeamMessageCreateRequest",
+    "TeamMessageUpdateRequest",
+    "TeamMessageRead",
+    "TeamTaskAssigneeRead",
+    "TeamTaskCreateRequest",
+    "TeamTaskUpdateRequest",
+    "TeamTaskAssigneesUpdateRequest",
+    "TeamTaskRead",
 ]

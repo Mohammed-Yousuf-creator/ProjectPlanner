@@ -6,6 +6,7 @@ This repository contains the backend for an event and hackathon management platf
 - **Phase 2:** Organizations, Event Management, Public Event Discovery, and Event Tracks.
 - **Phase 3:** Participant Registration, Dashboard, and Organizer Participant Management.
 - **Phase 4:** Team Formation and Membership Management.
+- **Phase 5:** Team Collaboration (task boards, multi-assignee task management, persistent team chat, WebSockets real-time updates, and local image/video storage).
 
 ---
 
@@ -42,22 +43,29 @@ backend/
 │   │       ├── tracks.py        # /api/v1/tracks/*
 │   │       ├── registrations.py # /api/v1/events/{event_id}/register, withdraw, participants
 │   │       ├── participants.py  # /api/v1/participants/me/*
-│   │       └── teams.py         # /api/v1/events/{event_id}/teams, /api/v1/teams/*, /api/v1/team-invitations/*
+│   │       ├── teams.py         # /api/v1/events/{event_id}/teams, /api/v1/teams/*, /api/v1/team-invitations/*
+│   │       ├── team_tasks.py    # /api/v1/teams/{team_id}/tasks/*
+│   │       ├── team_messages.py # /api/v1/teams/{team_id}/messages/* and WebSocket /ws
+│   │       └── team_files.py    # /api/v1/teams/{team_id}/files/*
 │   ├── core/
 │   │   ├── __init__.py
 │   │   ├── config.py            # Pydantic-settings configuration & .env loading
 │   │   ├── security.py          # Argon2 hashing & PyJWT token utilities
-│   │   └── dependencies.py      # get_current_user & get_optional_current_user
+│   │   ├── dependencies.py      # get_current_user & get_optional_current_user
+│   │   └── websocket_manager.py # Thread-safe WebSocket connection manager and broadcaster
 │   ├── db/
 │   │   ├── __init__.py
 │   │   ├── base.py              # DeclarativeBase & UTCDateTime TypeDecorator
 │   │   └── session.py           # SQLite connection, engine & SessionLocal factory
 │   ├── models/
-│   │   ├── __init__.py          # Exports and registers all 10 models with Base
+│   │   ├── __init__.py          # Exports and registers all 15 models with Base
 │   │   ├── user.py              # User and UserProfile models
 │   │   ├── organization.py      # Organization and OrganizationMember models
 │   │   ├── event.py             # Event, EventMembership, EventTrack models
-│   │   └── team.py              # Team, TeamMember, TeamInvitation models
+│   │   ├── team.py              # Team, TeamMember, TeamInvitation models
+│   │   ├── team_task.py         # TeamTask and TeamTaskAssignee models
+│   │   ├── team_message.py      # TeamMessage and TeamMessageAttachment models
+│   │   └── stored_file.py       # StoredFile model
 │   ├── schemas/
 │   │   ├── __init__.py          # Pydantic schema exports
 │   │   ├── auth.py              # RegisterRequest, LoginRequest, AuthResponse, TokenResponse
@@ -66,15 +74,24 @@ backend/
 │   │   ├── event.py             # EventCreate, EventUpdate, EventRead, EventTrack schemas
 │   │   ├── registration.py      # EventRegisterRequest, EventRegistrationResponse, OrganizerParticipantRead
 │   │   ├── participant.py       # ParticipantDashboardResponse, ParticipantRegistrationRead, etc.
-│   │   └── team.py              # TeamCreate, TeamRead, TeamMember*, TeamInvitation*
-│   └── services/
+│   │   ├── team.py              # TeamCreate, TeamRead, TeamMember*, TeamInvitation*
+│   │   ├── team_task.py         # TeamTaskCreateRequest, TeamTaskRead, TeamTaskAssigneesUpdateRequest
+│   │   ├── team_message.py      # TeamMessageCreateRequest, TeamMessageRead, TeamMessageUpdateRequest
+│   │   └── stored_file.py       # StoredFileRead
+│   ├── services/
+│   │   ├── __init__.py
+│   │   ├── auth_service.py         # Registration & authentication business logic
+│   │   ├── organization_service.py # Organization & membership authorization & business logic
+│   │   ├── event_service.py        # Event lifecycle, publishing, filtering & track logic
+│   │   ├── registration_service.py # Event registration, withdrawal, check-in & organizer participant management
+│   │   ├── participant_service.py  # Participant registrations list, dashboard, and registered event details
+│   │   ├── team_service.py         # Team creation, discovery, join codes, invitations, and membership management
+│   │   ├── team_task_service.py    # Team tasks, assignment list updates, status transitions, position ordering
+│   │   ├── team_chat_service.py    # Persistent messaging, safe attachments, edit, and soft-delete
+│   │   └── file_service.py         # Image/video uploads, streaming validation, safe download responses
+│   └── storage/
 │       ├── __init__.py
-│       ├── auth_service.py         # Registration & authentication business logic
-│       ├── organization_service.py # Organization & membership authorization & business logic
-│       ├── event_service.py        # Event lifecycle, publishing, filtering & track logic
-│       ├── registration_service.py # Event registration, withdrawal, check-in & organizer participant management
-│       ├── participant_service.py  # Participant registrations list, dashboard, and registered event details
-│       └── team_service.py         # Team creation, discovery, join codes, invitations, and membership management
+│       └── local_storage.py        # Local disk storage provider with chunked streaming and Pillow validation
 ├── alembic/
 │   ├── versions/                # Generated database migration files
 │   ├── env.py                   # Alembic environment configured with app settings & models
@@ -94,7 +111,8 @@ backend/
 │   ├── test_registrations.py             # Participant registration, withdrawal, reactivation, timing tests
 │   ├── test_participant_dashboard.py     # Participant dashboard, event categorization, and detail tests
 │   ├── test_organizer_participants.py    # Organizer participant management, approval, and check-in tests
-│   └── test_teams.py                     # Team creation, discovery, join code, invitations, and membership tests
+│   ├── test_teams.py                     # Team creation, discovery, join code, invitations, and membership tests
+│   └── test_team_collaboration.py        # Tasks, persistent messaging, WebSockets, and file upload tests
 ├── .env                         # Local environment settings (ignored by git)
 ├── .env.example                 # Example environment template
 ├── .gitignore                   # Git ignore patterns
@@ -107,7 +125,7 @@ backend/
 
 ## 3. Database Architecture & Models
 
-The system reuses 10 relational tables:
+The system comprises 15 relational tables:
 
 1. **`users`**: Central account table. Holds UUID, unique normalized email, unique normalized username, Argon2 password hash, account status, email verification timestamp, and UTC audit timestamps.
 2. **`user_profiles`**: One-to-one child record created automatically upon user registration with display name, bio, social links, and visibility settings.
@@ -119,6 +137,11 @@ The system reuses 10 relational tables:
 8. **`teams`**: Teams formed for a specific event with unique constraint on `(event_id, name)` and join code hash support.
 9. **`team_members`**: Membership of users in teams with unique constraint on `(team_id, user_id)`, role checks (`owner`, `lead`, `member`), and status checks (`active`, `left`).
 10. **`team_invitations`**: Pending invitations with database-level check constraint guaranteeing exactly one invite target (`(invitee_user_id IS NOT NULL AND invitee_email IS NULL) OR (invitee_user_id IS NULL AND invitee_email IS NOT NULL)`), code hash, and status checks.
+11. **`team_tasks`**: Tasks within a team board. Columns: `id`, `team_id`, `title`, `description`, `status` (`todo`, `in_progress`, `review`, `done`), `priority` (`low`, `medium`, `high`, `urgent`), `created_by_user_id`, `due_at`, `position`, `completed_at`, `created_at`, `updated_at`, `deleted_at`.
+12. **`team_task_assignees`**: Multiple user assignments per task. Composite primary key on `(task_id, user_id)`, with `assigned_by_user_id` and `assigned_at`.
+13. **`team_messages`**: Persistent team chat messages. Columns: `id`, `team_id`, `sender_user_id`, `body`, `created_at`, `edited_at`, `deleted_at`.
+14. **`stored_files`**: Safe file storage metadata. Columns: `id`, `team_id`, `uploaded_by_user_id`, `storage_provider`, `storage_key` (unique), `original_filename`, `mime_type`, `size_bytes`, `checksum_sha256`, `created_at`, `deleted_at`.
+15. **`team_message_attachments`**: Attachment join table between messages and stored files with unique constraint guaranteeing a file is attached to at most one message. Columns: `id`, `message_id`, `file_id`, `created_at`.
 
 ---
 
@@ -309,6 +332,81 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 - **`POST /api/v1/teams/{team_id}/disband`**:
   - Disband team. Restricted to team `owner`. Sets team status to `disbanded`, marks active memberships as `left`, and cancels pending invitations. Disbanded teams cannot accept new members or invitations.
 
+### Team Collaboration — Tasks, Messaging & Files (Phase 5)
+#### Team Task Management
+- **`POST /api/v1/teams/{team_id}/tasks`**:
+  - Create a new task within the team board (`title`, `description`, `priority`, `due_at`, `status`, `position`).
+  - Restricted to active team members.
+  - Automatically sets `team_id`, `created_by_user_id`, and `completed_at` (if created in `done` status).
+  - Broadcasts `task.created` event via WebSocket.
+- **`GET /api/v1/teams/{team_id}/tasks`**:
+  - List non-deleted tasks for the team.
+  - Supports status filtering (`status`), priority filtering (`priority`), assignee filtering (`assignee_id`), and pagination (`limit`, `offset`).
+  - Ordered by `position` ascending and creation timestamp. Eagerly loads assignees with profile details.
+- **`GET /api/v1/teams/{team_id}/tasks/{task_id}`**:
+  - Return detailed task information and assigned members. Restricted to active team members.
+- **`PATCH /api/v1/teams/{team_id}/tasks/{task_id}`**:
+  - Update task status, details, priority, due date, or position.
+  - Active members can update status. Only creator, owner, or lead can update details and priority.
+  - Automatically sets `completed_at` when entering `done` status, and clears it when leaving `done`.
+  - Broadcasts `task.updated` event via WebSocket.
+- **`DELETE /api/v1/teams/{team_id}/tasks/{task_id}`**:
+  - Soft-delete a task by setting `deleted_at`. Only creator, owner, or lead can delete.
+  - Broadcasts `task.deleted` event via WebSocket.
+- **`PUT /api/v1/teams/{team_id}/tasks/{task_id}/assignees`**:
+  - Transactionally replace task assignees list (`user_ids: List[UUID]`).
+  - Restricted to task creator, team owner, or team lead.
+  - Validates that every assignee is an active team member and prevents duplicates. Empty list clears assignments.
+  - Broadcasts `task.assignees.updated` event via WebSocket.
+
+#### Persistent Team Messaging
+- **`POST /api/v1/teams/{team_id}/messages`**:
+  - Post a message with optional text `body` and optional `attachment_ids` (stored file UUIDs).
+  - Requires non-empty text or at least one valid attachment.
+  - Validates all attachments belong to this team, have not been deleted, and are not already attached to another message.
+  - Saves message and attachment relationships in one database transaction.
+  - Broadcasts `message.created` event to all connected team WebSocket clients after commit.
+- **`GET /api/v1/teams/{team_id}/messages`**:
+  - Return chronological message history for the team.
+  - Includes sender username, display name, avatar, text body, and safe attachment metadata.
+  - Supports limit and offset pagination. Excludes filesystem paths.
+- **`PATCH /api/v1/teams/{team_id}/messages/{message_id}`**:
+  - Edit message text. Restricted to the original sender and active members. Sets `edited_at`.
+- **`DELETE /api/v1/teams/{team_id}/messages/{message_id}`**:
+  - Soft-delete message. Allowed for original sender, team owner, or team lead. Sets `deleted_at` and masks text.
+
+#### Real-time WebSockets
+- **`WebSocket /api/v1/teams/{team_id}/ws`**:
+  - Connect to real-time team collaboration updates.
+  - **Authentication Protocol:** Client sends its JWT access token in the first JSON message:
+    ```json
+    {"type": "authenticate", "access_token": "<JWT_ACCESS_TOKEN>"}
+    ```
+  - Validates signature, expiry, issuer, audience, and active team membership. Closes connection with policy violation code (`1008`) if invalid.
+  - On success, responds with:
+    ```json
+    {"type": "authenticated", "user_id": "<USER_UUID>", "team_id": "<TEAM_UUID>"}
+    ```
+  - Supports keep-alive `{"type": "ping"}` / `{"type": "pong"}`.
+  - Forcefully disconnects client sessions if member leaves the team, is removed, or the team is disbanded.
+  - **Broadcast Event Types:**
+    - `message.created`
+    - `message.updated`
+    - `message.deleted`
+    - `task.created`
+    - `task.updated`
+    - `task.deleted`
+    - `task.assignees.updated`
+
+#### Team File Storage
+- **`POST /api/v1/teams/{team_id}/files`**:
+  - Upload an image (`JPEG`, `PNG`, `WebP` up to 10 MB) or video (`MP4`, `WebM`, `MOV` up to 100 MB).
+  - Multipart/form-data upload streamed in chunks to local disk under `UPLOAD_DIR/{team_id}/`.
+  - Performs Pillow image open & verification and video container signature validation.
+  - Computes SHA-256 checksum and saves metadata in `stored_files`. Cleans up partial files on error.
+- **`GET /api/v1/teams/{team_id}/files/{file_id}`**:
+  - Download team file with safe `Content-Disposition` header. Restricted to active team members. Prevents cross-team IDOR access.
+
 ---
 
 ## 8. Running the Test Suite
@@ -319,9 +417,9 @@ The test suite runs with `pytest` against an isolated temporary SQLite database:
 pytest -v
 ```
 
-Total tests: **63 passing** across 10 test modules:
+Total tests: **74 passing** across 11 test modules:
 - `test_auth.py` (11 tests): Registration, duplicate checks, login, JWT validation, expiration, user me.
-- `test_models.py` (8 tests): All 10 tables registered, foreign keys, unique & check constraints, relationships.
+- `test_models.py` (8 tests): All 15 tables registered, foreign keys, unique & check constraints, relationships.
 - `test_health.py` (1 test): Health check & database ping.
 - `test_organizations.py` (6 tests): Org CRUD, slug uniqueness, user org listing, invitations accept/reject, member removal.
 - `test_events.py` (6 tests): Event creation, draft visibility, publishing validation, public discovery filtering, cancelling.
@@ -330,3 +428,4 @@ Total tests: **63 passing** across 10 test modules:
 - `test_participant_dashboard.py` (3 tests): Participant dashboard metrics, event categorization, registered event details.
 - `test_organizer_participants.py` (3 tests): Organizer participant roster, search/filter, status updates, check-in.
 - `test_teams.py` (14 tests): Team creation, lifecycle status transitions, join codes, team discovery, roster privacy, invitations, role updates, ownership transfer, disbanding, and capacity enforcement.
+- `test_team_collaboration.py` (11 tests): Tasks CRUD, status transitions, assignees replacement, persistent chat, attachments, WebSocket authentication, real-time broadcasts, file validation, oversized rejections, and disconnects on leave/disband.

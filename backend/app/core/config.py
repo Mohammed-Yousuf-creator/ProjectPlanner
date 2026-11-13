@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "Event Platform API"
     APP_ENV: str = "development"
     DATABASE_URL: str = "sqlite:///./data/app.db"
+    UPLOAD_DIR: str = str(BACKEND_DIR / "data" / "uploads")
 
     JWT_SECRET_KEY: str = "replace_with_a_random_secret"
     JWT_ALGORITHM: str = "HS256"

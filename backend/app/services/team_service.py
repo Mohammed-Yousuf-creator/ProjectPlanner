@@ -8,6 +8,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.security import hash_password, verify_password
+from app.core.websocket_manager import ws_manager
 from app.models.event import Event, EventMembership
 from app.models.team import Team, TeamInvitation, TeamMember
 from app.models.user import User
@@ -835,6 +836,7 @@ def leave_team(
 
     db.commit()
     db.refresh(my_member)
+    ws_manager.disconnect_member_sync(team.id, current_user.id, reason="left_team")
     return TeamMemberRead.model_validate(my_member)
 
 
@@ -903,6 +905,7 @@ def remove_team_member(
 
     db.commit()
     db.refresh(target_member)
+    ws_manager.disconnect_member_sync(team.id, target_user_id, reason="removed_from_team")
     return TeamMemberRead.model_validate(target_member)
 
 
@@ -1095,6 +1098,7 @@ def disband_team(
 
     db.commit()
     db.refresh(team)
+    ws_manager.disconnect_team_sync(team.id, reason="team_disbanded")
 
     event = team.event
     return TeamDetailRead(

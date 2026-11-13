@@ -1,6 +1,9 @@
 from app.models.event import Event, EventMembership, EventTrack
 from app.models.organization import Organization, OrganizationMember
+from app.models.stored_file import StoredFile
 from app.models.team import Team, TeamInvitation, TeamMember
+from app.models.team_message import TeamMessage, TeamMessageAttachment
+from app.models.team_task import TeamTask, TeamTaskAssignee
 from app.models.user import User, UserProfile
 
 __all__ = [
@@ -14,5 +17,10 @@ __all__ = [
     "Team",
     "TeamMember",
     "TeamInvitation",
+    "TeamTask",
+    "TeamTaskAssignee",
+    "TeamMessage",
+    "TeamMessageAttachment",
+    "StoredFile",
 ]
 

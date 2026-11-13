@@ -7,6 +7,9 @@ from app.api.routes import (
     organizations,
     participants,
     registrations,
+    team_files,
+    team_messages,
+    team_tasks,
     teams,
     tracks,
     users,
@@ -23,3 +26,6 @@ api_router.include_router(tracks.router, prefix="/tracks", tags=["Tracks"])
 api_router.include_router(registrations.router, tags=["Registrations"])
 api_router.include_router(participants.router, prefix="/participants", tags=["Participants"])
 api_router.include_router(teams.router, tags=["Teams"])
+api_router.include_router(team_tasks.router, tags=["Team Collaboration"])
+api_router.include_router(team_messages.router, tags=["Team Collaboration"])
+api_router.include_router(team_files.router, tags=["Team Collaboration"])
