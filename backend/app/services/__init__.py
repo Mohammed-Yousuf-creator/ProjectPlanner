@@ -35,6 +35,22 @@ from app.services.registration_service import (
     update_participant_status,
     withdraw_registration,
 )
+from app.services.team_service import (
+    accept_team_invitation,
+    create_team,
+    create_team_invitation,
+    disband_team,
+    get_team_details,
+    join_team_with_code,
+    leave_team,
+    list_event_teams,
+    list_my_team_invitations,
+    list_team_members,
+    reject_team_invitation,
+    remove_team_member,
+    transfer_team_ownership,
+    update_team_member_role,
+)
 
 __all__ = [
     "register_user",
@@ -67,4 +83,18 @@ __all__ = [
     "list_my_registrations",
     "get_participant_dashboard",
     "get_registered_event_detail",
+    "create_team",
+    "list_event_teams",
+    "get_team_details",
+    "join_team_with_code",
+    "create_team_invitation",
+    "list_my_team_invitations",
+    "accept_team_invitation",
+    "reject_team_invitation",
+    "list_team_members",
+    "leave_team",
+    "remove_team_member",
+    "update_team_member_role",
+    "transfer_team_ownership",
+    "disband_team",
 ]

@@ -5,6 +5,7 @@ This repository contains the backend for an event and hackathon management platf
 - **Phase 1:** Foundation (database architecture, 10 models, Pydantic schemas, Alembic migrations, JWT access tokens, Argon2 password hashing).
 - **Phase 2:** Organizations, Event Management, Public Event Discovery, and Event Tracks.
 - **Phase 3:** Participant Registration, Dashboard, and Organizer Participant Management.
+- **Phase 4:** Team Formation and Membership Management.
 
 ---
 
@@ -40,7 +41,8 @@ backend/
 │   │       ├── events.py        # /api/v1/events/*
 │   │       ├── tracks.py        # /api/v1/tracks/*
 │   │       ├── registrations.py # /api/v1/events/{event_id}/register, withdraw, participants
-│   │       └── participants.py  # /api/v1/participants/me/*
+│   │       ├── participants.py  # /api/v1/participants/me/*
+│   │       └── teams.py         # /api/v1/events/{event_id}/teams, /api/v1/teams/*, /api/v1/team-invitations/*
 │   ├── core/
 │   │   ├── __init__.py
 │   │   ├── config.py            # Pydantic-settings configuration & .env loading
@@ -71,7 +73,8 @@ backend/
 │       ├── organization_service.py # Organization & membership authorization & business logic
 │       ├── event_service.py        # Event lifecycle, publishing, filtering & track logic
 │       ├── registration_service.py # Event registration, withdrawal, check-in & organizer participant management
-│       └── participant_service.py  # Participant registrations list, dashboard, and registered event details
+│       ├── participant_service.py  # Participant registrations list, dashboard, and registered event details
+│       └── team_service.py         # Team creation, discovery, join codes, invitations, and membership management
 ├── alembic/
 │   ├── versions/                # Generated database migration files
 │   ├── env.py                   # Alembic environment configured with app settings & models
@@ -90,7 +93,8 @@ backend/
 │   ├── test_tracks.py                    # Event track creation, update, and deletion tests
 │   ├── test_registrations.py             # Participant registration, withdrawal, reactivation, timing tests
 │   ├── test_participant_dashboard.py     # Participant dashboard, event categorization, and detail tests
-│   └── test_organizer_participants.py    # Organizer participant management, approval, and check-in tests
+│   ├── test_organizer_participants.py    # Organizer participant management, approval, and check-in tests
+│   └── test_teams.py                     # Team creation, discovery, join code, invitations, and membership tests
 ├── .env                         # Local environment settings (ignored by git)
 ├── .env.example                 # Example environment template
 ├── .gitignore                   # Git ignore patterns
@@ -258,6 +262,53 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
   - Restricted to organization `owner` and `admin`.
   - Rejects check-ins for `waitlisted`, `rejected`, or `withdrawn` participants.
 
+### Team Formation & Membership Management (Phase 4)
+- **`POST /api/v1/events/{event_id}/teams`**:
+  - Atomically create a team and assign the authenticated participant as active `owner`.
+  - Restricted to registered or approved participants of the event. Rejects cancelled or completed events.
+  - Generates a cryptographically secure random join code when requested (`generate_join_code: true`), storing only its Argon2 hash in `join_code_hash`.
+  - Returns the raw join code only once in the creation response; `join_code_hash` is never exposed.
+  - Enforces unique team names per event and restricts each participant to at most one active team per event.
+  - Initializes status to `active` if `1 >= min_team_size`, else `forming`.
+- **`GET /api/v1/events/{event_id}/teams`**:
+  - Discovery endpoint for event teams. Restricted to registered or approved event participants.
+  - Excludes disbanded teams. Returns team ID, name, description, status, `member_count`, `max_team_size`, `available_slots`, and creation timestamp. Supports pagination (`limit`, `offset`).
+- **`GET /api/v1/teams/{team_id}`**:
+  - Return team details. Active members of the team receive the full roster (`user_id`, `username`, `display_name`, `role`, `status`, `joined_at`, `left_at`). Non-member event participants receive public overview with `members: null`.
+- **`POST /api/v1/teams/{team_id}/join`**:
+  - Join a team using its plaintext join code.
+  - Verifies code against Argon2 hash using constant-time verification.
+  - Rejects disbanded or submitted teams, teams at `max_team_size`, and users already belonging to another active team in the event.
+  - Reactivates previous `left` membership in-place rather than creating duplicate history.
+  - Recalculates team lifecycle (`forming` vs `active`).
+- **`POST /api/v1/teams/{team_id}/invitations`**:
+  - Send an in-app team invitation by user email.
+  - Restricted to team `owner` and `lead`.
+  - Resolves email to a registered user and verifies eligible event participation (`registered` or `approved`).
+  - Prevents inviting active team members, users in other active teams in this event, or duplicate pending invitations.
+  - Sets 7-day expiration timestamp and `pending` status.
+- **`GET /api/v1/participants/me/team-invitations`**:
+  - Return pending, non-expired invitations for the current authenticated user, including team, event, and inviter profile details.
+- **`POST /api/v1/team-invitations/{invitation_id}/accept`**:
+  - Accept a pending team invitation. Restricted to the intended invitee.
+  - Re-verifies event membership, capacity against `max_team_size`, and absence of other active teams in this event.
+  - Creates or reactivates team membership, marks invitation as `accepted`, and recalculates team lifecycle status.
+- **`POST /api/v1/team-invitations/{invitation_id}/reject`**:
+  - Reject a pending invitation. Restricted to the intended invitee. Sets status to `rejected` and records response timestamp.
+- **`GET /api/v1/teams/{team_id}/members`**:
+  - Return team roster. Restricted to active team members.
+- **`POST /api/v1/teams/{team_id}/leave`**:
+  - Allow an active non-owner member or lead to leave. Sets membership status to `left` and `left_at`.
+  - Rejects owner leaving without first transferring ownership. Recalculates team lifecycle status.
+- **`DELETE /api/v1/teams/{team_id}/members/{user_id}`**:
+  - Remove an active member. Restricted to team `owner`. Owner cannot remove themselves. Sets status to `left`.
+- **`PATCH /api/v1/teams/{team_id}/members/{user_id}/role`**:
+  - Assign or revoke `lead` role (`lead`, `member`). Restricted to team `owner`. Cannot modify owner role.
+- **`POST /api/v1/teams/{team_id}/transfer-ownership`**:
+  - Transfer ownership to an active team member. Atomically updates old owner to `member` and target to `owner`. Exactly one active owner is maintained.
+- **`POST /api/v1/teams/{team_id}/disband`**:
+  - Disband team. Restricted to team `owner`. Sets team status to `disbanded`, marks active memberships as `left`, and cancels pending invitations. Disbanded teams cannot accept new members or invitations.
+
 ---
 
 ## 8. Running the Test Suite
@@ -268,4 +319,14 @@ The test suite runs with `pytest` against an isolated temporary SQLite database:
 pytest -v
 ```
 
-Total tests: **49 passing** (authentication, database constraints, organizations, events, tracks, participant registration, withdrawal, dashboard, and organizer participant management).
+Total tests: **63 passing** across 10 test modules:
+- `test_auth.py` (11 tests): Registration, duplicate checks, login, JWT validation, expiration, user me.
+- `test_models.py` (8 tests): All 10 tables registered, foreign keys, unique & check constraints, relationships.
+- `test_health.py` (1 test): Health check & database ping.
+- `test_organizations.py` (6 tests): Org CRUD, slug uniqueness, user org listing, invitations accept/reject, member removal.
+- `test_events.py` (6 tests): Event creation, draft visibility, publishing validation, public discovery filtering, cancelling.
+- `test_tracks.py` (3 tests): Track CRUD and uniqueness constraints.
+- `test_registrations.py` (8 tests): Participant registration, withdrawal, reactivation, timing boundaries, organizer check-in.
+- `test_participant_dashboard.py` (3 tests): Participant dashboard metrics, event categorization, registered event details.
+- `test_organizer_participants.py` (3 tests): Organizer participant roster, search/filter, status updates, check-in.
+- `test_teams.py` (14 tests): Team creation, lifecycle status transitions, join codes, team discovery, roster privacy, invitations, role updates, ownership transfer, disbanding, and capacity enforcement.

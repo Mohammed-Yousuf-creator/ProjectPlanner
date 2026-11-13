@@ -7,6 +7,7 @@ from app.api.routes import (
     organizations,
     participants,
     registrations,
+    teams,
     tracks,
     users,
 )
@@ -21,3 +22,4 @@ api_router.include_router(events.router, prefix="/events", tags=["Events"])
 api_router.include_router(tracks.router, prefix="/tracks", tags=["Tracks"])
 api_router.include_router(registrations.router, tags=["Registrations"])
 api_router.include_router(participants.router, prefix="/participants", tags=["Participants"])
+api_router.include_router(teams.router, tags=["Teams"])

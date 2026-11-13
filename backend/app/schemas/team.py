@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import Literal, Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
@@ -9,6 +9,68 @@ class TeamCreate(BaseModel):
     event_id: uuid.UUID
     name: str = Field(min_length=2, max_length=150)
     description: Optional[str] = None
+
+
+class TeamCreateRequest(BaseModel):
+    name: str = Field(min_length=2, max_length=150)
+    description: Optional[str] = None
+    generate_join_code: bool = True
+
+
+class TeamCreatedResponse(BaseModel):
+    id: uuid.UUID
+    event_id: uuid.UUID
+    name: str
+    description: Optional[str] = None
+    created_by_user_id: uuid.UUID
+    status: str
+    created_at: datetime
+    updated_at: datetime
+    join_code: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TeamDiscoveryItem(BaseModel):
+    id: uuid.UUID
+    name: str
+    description: Optional[str] = None
+    status: str
+    member_count: int
+    max_team_size: int
+    available_slots: int
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TeamMemberInfo(BaseModel):
+    user_id: uuid.UUID
+    username: str
+    display_name: str
+    role: str
+    status: str
+    joined_at: datetime
+    left_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TeamDetailRead(BaseModel):
+    id: uuid.UUID
+    event_id: uuid.UUID
+    name: str
+    description: Optional[str] = None
+    status: str
+    created_by_user_id: uuid.UUID
+    created_at: datetime
+    updated_at: datetime
+    member_count: int
+    max_team_size: int
+    available_slots: int
+    members: Optional[List[TeamMemberInfo]] = None
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class TeamRead(BaseModel):
@@ -32,6 +94,24 @@ class TeamMemberRead(BaseModel):
     status: str
     joined_at: datetime
     left_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TeamJoinRequest(BaseModel):
+    join_code: str = Field(min_length=1)
+
+
+class TeamInviteCreateRequest(BaseModel):
+    invitee_email: EmailStr
+
+
+class TeamInviterInfo(BaseModel):
+    user_id: uuid.UUID
+    username: str
+    display_name: str
+    email: Optional[EmailStr] = None
+    avatar_url: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -65,6 +145,27 @@ class TeamInvitationRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class TeamInvitationDetailRead(BaseModel):
+    id: uuid.UUID
+    team_id: uuid.UUID
+    team_name: str
+    event_id: uuid.UUID
+    event_name: str
+    inviter: TeamInviterInfo
+    expires_at: datetime
+    status: str
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class TeamInvitationRespond(BaseModel):
     action: Literal["accept", "reject"]
 
+
+class TeamMemberRoleUpdateRequest(BaseModel):
+    role: Literal["lead", "member"]
+
+
+class TeamTransferOwnershipRequest(BaseModel):
+    new_owner_user_id: uuid.UUID
