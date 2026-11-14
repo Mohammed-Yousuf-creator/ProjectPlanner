@@ -19,7 +19,7 @@ export function AuthLayout({
       <header className="border-b border-line bg-white/95">
         <div className="mx-auto flex h-16 max-w-7xl items-center px-4 sm:px-6 lg:px-8">
           <Link to="/" className="flex items-center gap-2">
-            <span className="text-2xl font-bold tracking-tight text-ink">Event Platform</span>
+            <span className="text-2xl font-bold tracking-tight text-ink">AEGIS</span>
             <BrandDot />
           </Link>
         </div>

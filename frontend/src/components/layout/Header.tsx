@@ -38,7 +38,7 @@ export function Header() {
             to="/"
             className="group flex shrink-0 items-center gap-2 focus:outline-none focus-visible:ring-1 focus-visible:ring-forest"
           >
-            <span className="text-2xl font-bold tracking-tight text-ink">Event Platform</span>
+            <span className="text-2xl font-bold tracking-tight text-ink">AEGIS</span>
             <BrandDot />
             <span className="hidden rounded-lg border border-line bg-canvas px-2 py-0.5 font-mono text-[11px] uppercase tracking-wider text-taupe sm:inline">
               Console
