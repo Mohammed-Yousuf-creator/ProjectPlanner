@@ -48,7 +48,14 @@ export function OrganizationDetailPage() {
     organization_type: 'organizer',
   });
 
-  // Sync the edit form once the organization resolves (or after an update).
+  // Sync the edit form once the organization resolves, and again only when the
+  // server data actually changes. Keying on `org.data` (an object) meant every
+  // background refetch — even one returning identical data — reset the fields
+  // while the user was mid-edit. `dataUpdatedAt` only advances on a real fetch
+  // result; combined with the field values it is a stable, content-based key.
+  const orgSnapshot = org.data
+    ? `${org.data.name}|${org.data.description ?? ''}|${org.data.website_url ?? ''}|${org.data.contact_email ?? ''}|${org.data.organization_type}`
+    : null;
   useEffect(() => {
     if (!org.data) return;
     setForm({
@@ -58,7 +65,8 @@ export function OrganizationDetailPage() {
       contact_email: org.data.contact_email ?? '',
       organization_type: org.data.organization_type,
     });
-  }, [org.data]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orgSnapshot]);
 
   if (org.isLoading) {
     return (

@@ -17,6 +17,7 @@ import { toApiError } from '@/lib/errors';
 import type { TeamDetailRead, TeamMemberInfo } from '@/api/types';
 import { CreateProjectModal } from './CreateProjectModal';
 import { SubmissionPanel } from './SubmissionPanel';
+import { SubmissionSummaryCard } from '@/components/ai/SubmissionSummaryCard';
 
 export function TeamProjectTab({
   team,
@@ -175,6 +176,16 @@ export function TeamProjectTab({
         canManage={canManage}
         readiness={readiness}
       />
+
+      {project.latest_submission && (
+        <SubmissionSummaryCard
+          // Keyed on the submission id so switching versions refetches rather
+          // than showing the previous version's cached overview.
+          key={project.latest_submission.id}
+          submissionId={project.latest_submission.id}
+          enabled={project.latest_submission.status === 'submitted'}
+        />
+      )}
 
       <p className="flex items-center gap-1.5 text-[11px] text-muted">
         <GitBranch className="h-3 w-3" aria-hidden="true" />

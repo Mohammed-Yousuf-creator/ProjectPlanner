@@ -17,7 +17,8 @@ htmlcov/
 # Environment files
 .env
 
-# SQLite databases & temp files
+# Runtime data: SQLite databases, uploads, anything else written at runtime
+data/uploads/
 data/*.db
 data/*.db-journal
 data/*.db-wal

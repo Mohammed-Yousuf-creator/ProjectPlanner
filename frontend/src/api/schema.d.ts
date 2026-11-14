@@ -2164,10 +2164,251 @@ export interface paths {
         patch: operations["patch_deliverable_api_v1_sponsorship_deliverables__deliverable_id__patch"];
         trace?: never;
     };
+    "/api/v1/ai/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Report which AI features are live
+         * @description Unauthenticated on purpose: the landing page and login screen use this to
+         *     decide whether to advertise AI features at all.
+         */
+        get: operations["get_ai_status_api_v1_ai_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users/me/skills": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List my skills */
+        get: operations["list_my_skills_api_v1_users_me_skills_get"];
+        /**
+         * Replace my skills
+         * @description Whole-set replacement, so removing a chip in the UI removes it here.
+         */
+        put: operations["replace_my_skills_api_v1_users_me_skills_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users/{user_id}/skills": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List another user's skills
+         * @description Skills are public profile data, but require authentication so they cannot
+         *     be scraped anonymously.
+         */
+        get: operations["list_member_skills_api_v1_users__user_id__skills_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{event_id}/matchmaking/teammates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Suggest teammates whose skills complement mine
+         * @description Deterministic ranking — see `skill_matching.py` for the algorithm.
+         */
+        get: operations["match_teammates_endpoint_api_v1_events__event_id__matchmaking_teammates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{event_id}/matchmaking/teams": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Rank open teams by how much I would add to them */
+        get: operations["match_teams_endpoint_api_v1_events__event_id__matchmaking_teams_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{event_id}/matchmaking/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview matches for a pasted skill list
+         * @description Answers "what if I added Rust?" without saving anything to the profile.
+         */
+        post: operations["preview_matches_endpoint_api_v1_events__event_id__matchmaking_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai/conversations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List my assistant conversations */
+        get: operations["list_conversations_endpoint_api_v1_ai_conversations_get"];
+        put?: never;
+        /** Start a conversation */
+        post: operations["create_conversation_endpoint_api_v1_ai_conversations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai/conversations/{conversation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read a conversation */
+        get: operations["get_conversation_endpoint_api_v1_ai_conversations__conversation_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete a conversation */
+        delete: operations["delete_conversation_endpoint_api_v1_ai_conversations__conversation_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai/conversations/{conversation_id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send a message and get a reply */
+        post: operations["send_message_endpoint_api_v1_ai_conversations__conversation_id__messages_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai/chat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * One-shot chat (creates a conversation if needed)
+         * @description Convenience for the floating widget: no conversation id required.
+         */
+        post: operations["chat_endpoint_api_v1_ai_chat_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/submissions/{submission_id}/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** AI overview of a submission */
+        get: operations["get_submission_summary_endpoint_api_v1_submissions__submission_id__summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{event_id}/ai/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** AI digest of every submitted project in an event */
+        get: operations["get_event_overview_endpoint_api_v1_events__event_id__ai_overview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * AiStatusRead
+         * @description Lets the UI hide/disable AI affordances when no key is configured.
+         */
+        AiStatusRead: {
+            /** Ai Enabled */
+            ai_enabled: boolean;
+            /** Model */
+            model?: string | null;
+            /** Features */
+            features?: {
+                [key: string]: boolean;
+            };
+        };
         /** AnnouncementCreate */
         AnnouncementCreate: {
             /** Title */
@@ -2249,6 +2490,97 @@ export interface components {
         Body_upload_file_api_v1_teams__team_id__files_post: {
             /** File */
             file: string;
+        };
+        /** ChatConversationRead */
+        ChatConversationRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string;
+            /** Event Id */
+            event_id?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Messages */
+            messages?: components["schemas"]["ChatMessageRead"][];
+        };
+        /**
+         * ChatConversationSummaryRead
+         * @description List entry: no messages, just enough to render a sidebar row.
+         */
+        ChatConversationSummaryRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string;
+            /** Event Id */
+            event_id?: string | null;
+            /**
+             * Message Count
+             * @default 0
+             */
+            message_count: number;
+            /** Last Message Preview */
+            last_message_preview?: string | null;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** ChatMessageRead */
+        ChatMessageRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Role */
+            role: string;
+            /** Content */
+            content: string;
+            /** Source */
+            source: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** ChatSendRequest */
+        ChatSendRequest: {
+            /** Message */
+            message: string;
+            /** Event Id */
+            event_id?: string | null;
+        };
+        /** ChatSendResponse */
+        ChatSendResponse: {
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
+            user_message: components["schemas"]["ChatMessageRead"];
+            assistant_message: components["schemas"]["ChatMessageRead"];
+            /** Ai Generated */
+            ai_generated: boolean;
+            /** Note */
+            note?: string | null;
         };
         /** CheckInAttendeeRead */
         CheckInAttendeeRead: {
@@ -2420,6 +2752,24 @@ export interface components {
              * @default 4
              */
             max_team_size: number;
+        };
+        /** EventOverviewResponse */
+        EventOverviewResponse: {
+            /**
+             * Event Id
+             * Format: uuid
+             */
+            event_id: string;
+            /** Generated */
+            generated: number;
+            /** Cached */
+            cached: number;
+            /** Skipped */
+            skipped: number;
+            /** Items */
+            items?: components["schemas"]["ProjectOverviewItem"][];
+            /** Note */
+            note?: string | null;
         };
         /** EventRead */
         EventRead: {
@@ -3436,6 +3786,30 @@ export interface components {
             submissions: components["schemas"]["ProjectSubmissionRead"][];
             latest_submission?: components["schemas"]["ProjectSubmissionRead"] | null;
         };
+        /**
+         * ProjectOverviewItem
+         * @description One submission's overview inside an event-wide digest.
+         */
+        ProjectOverviewItem: {
+            /**
+             * Submission Id
+             * Format: uuid
+             */
+            submission_id: string;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Team Name */
+            team_name: string;
+            /** Title */
+            title: string;
+            /** Tldr */
+            tldr: string;
+            /** Technologies */
+            technologies?: string[];
+        };
         /** ProjectPublicRead */
         ProjectPublicRead: {
             /**
@@ -3566,6 +3940,91 @@ export interface components {
             password: string;
             /** Display Name */
             display_name: string;
+        };
+        /**
+         * SkillCreate
+         * @description Add one skill to your profile.
+         *
+         *     `label` is what the user typed; the server normalises it and stores the
+         *     canonical `name` itself, so clients never have to know the rules.
+         */
+        SkillCreate: {
+            /** Label */
+            label: string;
+            /**
+             * Proficiency
+             * @default 3
+             */
+            proficiency: number;
+        };
+        /**
+         * SkillMatchRead
+         * @description One ranked match plus the reasoning behind its score.
+         */
+        SkillMatchRead: {
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            /** Display Name */
+            display_name: string;
+            /** Username */
+            username?: string | null;
+            /** Headline */
+            headline?: string | null;
+            /** City */
+            city?: string | null;
+            /** Score */
+            score: number;
+            /** Shared Skills */
+            shared_skills?: string[];
+            /** Complementary Skills */
+            complementary_skills?: string[];
+            /** Candidate Skills */
+            candidate_skills?: string[];
+            /** Reasons */
+            reasons?: string[];
+        };
+        /**
+         * SkillMatchRequest
+         * @description Ad-hoc match against a pasted skill list (useful for "what if" checks).
+         */
+        SkillMatchRequest: {
+            /** Skills */
+            skills?: string[];
+            /**
+             * Limit
+             * @default 10
+             */
+            limit: number;
+        };
+        /** SkillRead */
+        SkillRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Label */
+            label: string;
+            /** Proficiency */
+            proficiency: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /**
+         * SkillReplace
+         * @description Replace the whole skill set in one call (the profile editor's Save).
+         */
+        SkillReplace: {
+            /** Skills */
+            skills?: components["schemas"]["SkillCreate"][];
         };
         /** SponsorDiscoveryRead */
         SponsorDiscoveryRead: {
@@ -4109,6 +4568,38 @@ export interface components {
              */
             created_at: string;
         };
+        /** SubmissionSummaryRead */
+        SubmissionSummaryRead: {
+            /**
+             * Submission Id
+             * Format: uuid
+             */
+            submission_id: string;
+            /** Tldr */
+            tldr: string;
+            /** Overview */
+            overview: string;
+            /** Highlights */
+            highlights?: string[];
+            /** Technologies */
+            technologies?: string[];
+            /** Talking Points */
+            talking_points?: string[];
+            /** Source */
+            source: string;
+            /** Model Name */
+            model_name?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Cached
+             * @default false
+             */
+            cached: boolean;
+        };
         /** TeamCreateRequest */
         TeamCreateRequest: {
             /** Name */
@@ -4368,6 +4859,55 @@ export interface components {
             /** Join Code */
             join_code: string;
         };
+        /**
+         * TeamMatchRead
+         * @description A team ranked by what the caller would add to it.
+         */
+        TeamMatchRead: {
+            /**
+             * Team Id
+             * Format: uuid
+             */
+            team_id: string;
+            /** Team Name */
+            team_name: string;
+            /**
+             * Member Count
+             * @default 0
+             */
+            member_count: number;
+            /** Score */
+            score: number;
+            /** Shared Skills */
+            shared_skills?: string[];
+            /** Complementary Skills */
+            complementary_skills?: string[];
+            /** Team Skills */
+            team_skills?: string[];
+            /** Reasons */
+            reasons?: string[];
+        };
+        /** TeamMatchResponse */
+        TeamMatchResponse: {
+            /**
+             * Event Id
+             * Format: uuid
+             */
+            event_id: string;
+            /**
+             * Algorithm
+             * @default skill_complementarity_v1
+             */
+            algorithm: string;
+            /** Has Skills */
+            has_skills: boolean;
+            /** My Skills */
+            my_skills?: string[];
+            /** Matches */
+            matches?: components["schemas"]["TeamMatchRead"][];
+            /** Note */
+            note?: string | null;
+        };
         /** TeamMemberInfo */
         TeamMemberInfo: {
             /**
@@ -4608,6 +5148,30 @@ export interface components {
              * Format: uuid
              */
             new_owner_user_id: string;
+        };
+        /**
+         * TeammateMatchResponse
+         * @description Results of "who complements me in this event?".
+         */
+        TeammateMatchResponse: {
+            /**
+             * Event Id
+             * Format: uuid
+             */
+            event_id: string;
+            /**
+             * Algorithm
+             * @default skill_complementarity_v1
+             */
+            algorithm: string;
+            /** Has Skills */
+            has_skills: boolean;
+            /** My Skills */
+            my_skills?: string[];
+            /** Matches */
+            matches?: components["schemas"]["SkillMatchRead"][];
+            /** Note */
+            note?: string | null;
         };
         /** TokenResponse */
         TokenResponse: {
@@ -8846,6 +9410,468 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SponsorshipDeliverableRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_ai_status_api_v1_ai_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiStatusRead"];
+                };
+            };
+        };
+    };
+    list_my_skills_api_v1_users_me_skills_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SkillRead"][];
+                };
+            };
+        };
+    };
+    replace_my_skills_api_v1_users_me_skills_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SkillReplace"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SkillRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_member_skills_api_v1_users__user_id__skills_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SkillRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    match_teammates_endpoint_api_v1_events__event_id__matchmaking_teammates_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeammateMatchResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    match_teams_endpoint_api_v1_events__event_id__matchmaking_teams_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamMatchResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_matches_endpoint_api_v1_events__event_id__matchmaking_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SkillMatchRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeammateMatchResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_conversations_endpoint_api_v1_ai_conversations_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatConversationSummaryRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_conversation_endpoint_api_v1_ai_conversations_post: {
+        parameters: {
+            query?: {
+                event_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatConversationRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_conversation_endpoint_api_v1_ai_conversations__conversation_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatConversationRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_conversation_endpoint_api_v1_ai_conversations__conversation_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    send_message_endpoint_api_v1_ai_conversations__conversation_id__messages_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatSendRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatSendResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    chat_endpoint_api_v1_ai_chat_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatSendRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatSendResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_submission_summary_endpoint_api_v1_submissions__submission_id__summary_get: {
+        parameters: {
+            query?: {
+                /** @description Regenerate instead of using the cache */
+                refresh?: boolean;
+            };
+            header?: never;
+            path: {
+                submission_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubmissionSummaryRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_event_overview_endpoint_api_v1_events__event_id__ai_overview_get: {
+        parameters: {
+            query?: {
+                refresh?: boolean;
+            };
+            header?: never;
+            path: {
+                event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventOverviewResponse"];
                 };
             };
             /** @description Validation Error */

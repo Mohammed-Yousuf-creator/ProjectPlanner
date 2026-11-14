@@ -82,6 +82,24 @@ function bodyFor(rawUrl: string): { status: number; data: unknown } {
     };
   }
 
+  if (path === '/ai/status') {
+    return {
+      status: 200,
+      data: {
+        ai_enabled: false,
+        model: 'gemini-2.5-flash',
+        features: {
+          chat: true,
+          submission_summary: true,
+          team_matching: true,
+          event_overview: true,
+        },
+      },
+    };
+  }
+  if (path === '/users/me/skills') return { status: 200, data: [] };
+  if (path === '/ai/conversations') return { status: 200, data: [] };
+
   if (path === '/sponsors') return { status: 200, data: [] };
   if (path === '/sponsorship-listings') return { status: 200, data: [makeListing()] };
   if (path === '/sponsorship-listings/listing-1') return { status: 200, data: makeListing() };
@@ -125,6 +143,9 @@ const ROUTES_TO_SMOKE = [
   '/events/event-1/announcements',
   '/events/event-1/mentor',
   '/teams/team-1',
+  '/assistant',
+  '/my/skills',
+  '/events/event-1/matchmaking',
   '/definitely-not-a-route',
 ];
 

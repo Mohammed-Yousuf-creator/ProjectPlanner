@@ -142,3 +142,22 @@ export type SponsorshipDealStatusUpdate = S['SponsorshipDealStatusUpdate'];
 export type SponsorshipDeliverableCreate = S['SponsorshipDeliverableCreate'];
 export type SponsorshipDeliverableUpdate = S['SponsorshipDeliverableUpdate'];
 export type SponsorshipDeliverableRead = S['SponsorshipDeliverableRead'];
+
+/* ---------------------------------- AI ---------------------------------- */
+export type AiStatusRead = S['AiStatusRead'];
+export type SkillRead = S['SkillRead'];
+export type SkillCreate = S['SkillCreate'];
+export type SkillReplace = S['SkillReplace'];
+export type SkillMatchRead = S['SkillMatchRead'];
+export type TeamMatchRead = S['TeamMatchRead'];
+export type TeammateMatchResponse = S['TeammateMatchResponse'];
+export type TeamMatchResponse = S['TeamMatchResponse'];
+export type SkillMatchRequest = S['SkillMatchRequest'];
+export type ChatMessageRead = S['ChatMessageRead'];
+export type ChatConversationRead = S['ChatConversationRead'];
+export type ChatConversationSummaryRead = S['ChatConversationSummaryRead'];
+export type ChatSendRequest = S['ChatSendRequest'];
+export type ChatSendResponse = S['ChatSendResponse'];
+export type SubmissionSummaryRead = S['SubmissionSummaryRead'];
+export type ProjectOverviewItem = S['ProjectOverviewItem'];
+export type EventOverviewResponse = S['EventOverviewResponse'];

@@ -1,4 +1,4 @@
-import { useForm } from 'react-hook-form';
+import { useAppForm } from '@/hooks/useAppForm';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Modal } from '@/components/ui/Modal';
@@ -46,7 +46,7 @@ export function CreateTaskModal({
     handleSubmit,
     reset,
     formState: { errors },
-  } = useForm<FormValues>({
+  } = useAppForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
       title: '',

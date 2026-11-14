@@ -15,6 +15,8 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/marketplace', label: 'Marketplace' },
   { to: '/sponsors', label: 'Sponsors' },
   { to: '/dashboard', label: 'Dashboard', authOnly: true },
+  { to: '/assistant', label: 'Assistant', authOnly: true },
+  { to: '/my/skills', label: 'Skills', authOnly: true },
   { to: '/organizations', label: 'Organizations', authOnly: true },
 ];
 

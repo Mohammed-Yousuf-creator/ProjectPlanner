@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.api.routes import (
+    ai,
     announcements,
     auth,
     checkins,
@@ -57,3 +58,4 @@ api_router.include_router(sponsorship_listings.router, tags=["Sponsorship Market
 api_router.include_router(sponsorship_proposals.router, tags=["Sponsorship Marketplace"])
 api_router.include_router(sponsorship_deals.router, tags=["Sponsorship Marketplace"])
 api_router.include_router(sponsorship_deliverables.router, tags=["Sponsorship Marketplace"])
+api_router.include_router(ai.router, tags=["AI"])

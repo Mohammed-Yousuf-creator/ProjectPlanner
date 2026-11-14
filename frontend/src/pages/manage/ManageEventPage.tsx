@@ -21,6 +21,7 @@ import { ManageScheduleTab } from './ManageScheduleTab';
 import { ManageAnnouncementsTab } from './ManageAnnouncementsTab';
 import { ManageJudgingTab } from './ManageJudgingTab';
 import { ManageMentorTab } from './ManageMentorTab';
+import { ManageAiOverviewTab } from './ManageAiOverviewTab';
 
 const TABS: TabItem[] = [
   { value: 'overview', label: 'Overview' },
@@ -31,6 +32,7 @@ const TABS: TabItem[] = [
   { value: 'announcements', label: 'Announcements' },
   { value: 'judging', label: 'Judges & criteria' },
   { value: 'mentor', label: 'Mentor requests' },
+  { value: 'ai-overview', label: 'AI overview' },
 ];
 
 /**
@@ -133,6 +135,7 @@ export function ManageEventPage() {
       {tab === 'announcements' && <ManageAnnouncementsTab eventId={event.id} />}
       {tab === 'judging' && <ManageJudgingTab eventId={event.id} />}
       {tab === 'mentor' && <ManageMentorTab eventId={event.id} />}
+      {tab === 'ai-overview' && <ManageAiOverviewTab eventId={event.id} />}
     </div>
   );
 }
