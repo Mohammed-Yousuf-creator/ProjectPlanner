@@ -1,13 +1,27 @@
 # Open questions / backend gaps
 
-Everything here is a **workaround already implemented in this frontend**, listed so the
-backend team can remove the workaround later. Each entry names the exact file that would
-change. Backend owners should read `../../Backend_missing.md`, which expands the first
-entries into step-by-step implementation guides.
+> **Status: entries 1–7 are resolved.** The backend gaps this document tracked were
+> closed, and the frontend workarounds were removed. Gaps 8–12 remain open — they are all
+> polish, and each one documents the workaround still in use.
+>
+> Kept as a record of what changed and why; see `../../Backend_missing.md` for the
+> implementation notes of the closed items.
 
----
+### Resolved
 
-## 1. No "get my team for an event" endpoint
+| # | Was | Now |
+| --- | --- | --- |
+| 1 | Probing every team to find "mine" | `GET /events/{id}/my-team`; 404 = no team |
+| 2 | Files derived from the last 100 chat messages | `GET /teams/{id}/files`, paginated |
+| 3 | Direct links only for judges/mentors | `/users/me/judging-events`, `/users/me/mentoring-events` |
+| 4 | Any 401 ended the session | `POST /auth/refresh` + transparent retry in the axios interceptor |
+| 5 | No CORS | Settings-driven `CORSMiddleware` (`CORS_ORIGINS`) |
+| 6 | WS payloads treated as opaque | Envelope `{type, data}` pinned by a backend test |
+| 7 | Only deal/proposal notifications linked | `src/lib/notificationTarget.ts` covers every type |
+
+### Still open
+
+## 1. No "get my team for an event" endpoint ✅ **Resolved**
 
 **Symptom.** There is no way to ask "which team in event X am I on?" in a single request.
 
@@ -27,7 +41,7 @@ plumbing) is deleted.
 
 ---
 
-## 2. No endpoint to list a team's files
+## 2. No endpoint to list a team's files ✅ **Resolved**
 
 **Symptom.** Files are uploaded to `POST /teams/{id}/files` and come back attached to
 messages as `StoredFileRead[]`, but there is no `GET /teams/{id}/files`.
@@ -45,7 +59,7 @@ plain paginated query; the derivation logic is deleted.
 
 ---
 
-## 3. No "events I judge / mentor" endpoint
+## 3. No "events I judge / mentor" endpoint ✅ **Resolved**
 
 **Symptom.** A judge or mentor cannot discover their own events from the API.
 
@@ -63,7 +77,7 @@ point.
 
 ---
 
-## 4. No token refresh
+## 4. No token refresh ✅ **Resolved**
 
 **Symptom.** The access token expires after 30 minutes with no refresh endpoint.
 
@@ -79,7 +93,7 @@ single-flight refresh-and-retry queue; the redirect only happens if the refresh 
 
 ---
 
-## 5. No CORS middleware
+## 5. No CORS middleware ✅ **Resolved**
 
 **Symptom.** The backend sends no `Access-Control-Allow-*` headers, so a browser on a
 different origin cannot call it.
@@ -98,7 +112,7 @@ if a separate API host is introduced.
 
 ---
 
-## 6. WebSocket payload shapes are undocumented
+## 6. WebSocket payload shapes are undocumented ✅ **Resolved**
 
 **Symptom.** `backend/README.md` documents the frame *types*
 (`message.created`, `task.updated`, …) and the authenticate handshake, but not the
@@ -119,7 +133,7 @@ which removes a round-trip per message.
 
 ---
 
-## 7. Notification deep-link targets are inferred
+## 7. Notification deep-link targets are inferred ✅ **Resolved**
 
 **Symptom.** `NotificationRead` carries `reference_type`/`reference_id`, but the frontend
 does not know which reference types have a routable page.

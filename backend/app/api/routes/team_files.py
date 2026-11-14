@@ -1,16 +1,45 @@
 import uuid
 
-from fastapi import APIRouter, Depends, File, UploadFile, status
+from typing import List
+
+from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_current_user
 from app.db.session import get_db
 from app.models.user import User
-from app.schemas.stored_file import StoredFileRead
-from app.services.file_service import download_team_file, upload_team_file
+from app.schemas.stored_file import StoredFileRead, TeamFileRead
+from app.services.file_service import (
+    download_team_file,
+    list_team_files,
+    upload_team_file,
+)
 
 router = APIRouter()
+
+
+@router.get(
+    "/teams/{team_id}/files",
+    response_model=List[TeamFileRead],
+    status_code=status.HTTP_200_OK,
+    summary="List team files",
+)
+def list_files(
+    team_id: uuid.UUID,
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> List[TeamFileRead]:
+    """List files shared in the team, newest first. Active team members only.
+
+    Soft-deleted files are excluded. Each row names the uploader and, when the
+    file arrived as a chat attachment, the message that references it.
+    """
+    return list_team_files(
+        db, team_id, current_user, limit=limit, offset=offset
+    )
 
 
 @router.post(

@@ -372,3 +372,19 @@ def cancel_mentor_request(
     db.refresh(req)
     return _build_mentor_request_read(req)
 
+
+
+def list_my_mentoring_events(db: Session, current_user: User) -> List[Event]:
+    """Return distinct events where the current user mentors a request.
+
+    A mentor can be assigned across several requests in one event, so the result
+    is de-duplicated; events are ordered newest-start first.
+    """
+    return (
+        db.query(Event)
+        .join(MentorRequest, MentorRequest.event_id == Event.id)
+        .filter(MentorRequest.assigned_mentor_user_id == current_user.id)
+        .distinct()
+        .order_by(Event.starts_at.desc().nullslast(), Event.created_at.desc())
+        .all()
+    )

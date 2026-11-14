@@ -1,13 +1,18 @@
 import uuid
 from typing import Tuple
 
+import jwt
+
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
+from app.core.config import settings
 from app.core.security import (
     create_access_token,
+    create_refresh_token,
+    decode_refresh_token,
     hash_password,
     verify_password,
 )
@@ -15,6 +20,7 @@ from app.models.user import User, UserProfile
 from app.schemas.auth import (
     AuthResponse,
     LoginRequest,
+    RefreshRequest,
     RegisterRequest,
     TokenResponse,
 )
@@ -97,6 +103,8 @@ def register_user(db: Session, request: RegisterRequest) -> AuthResponse:
     return AuthResponse(
         access_token=access_token,
         token_type="bearer",
+        refresh_token=create_refresh_token(subject=user.id),
+        expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         user=UserMeResponse.model_validate(user),
     )
 
@@ -126,5 +134,56 @@ def authenticate_user(db: Session, request: LoginRequest) -> TokenResponse:
     return TokenResponse(
         access_token=access_token,
         token_type="bearer",
+        refresh_token=create_refresh_token(subject=user.id),
+        expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
     )
 
+
+
+def refresh_session(db: Session, request: RefreshRequest) -> TokenResponse:
+    """Exchange a valid refresh token for a fresh access token.
+
+    The refresh token is validated for signature, expiry, issuer, audience and
+    `typ`, so an access token presented here is rejected. A new refresh token is
+    issued alongside the access token (rotation), which bounds the value of a
+    leaked token to a single use without needing server-side state.
+    """
+    try:
+        payload = decode_refresh_token(request.refresh_token)
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token has expired",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    except jwt.InvalidTokenError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    subject = payload.get("sub")
+    try:
+        user_id = uuid.UUID(str(subject))
+    except (TypeError, ValueError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    user = db.get(User, user_id)
+    if not user or user.account_status != "active":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found or inactive",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    return TokenResponse(
+        access_token=create_access_token(subject=user.id),
+        token_type="bearer",
+        refresh_token=create_refresh_token(subject=user.id),
+        expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+    )

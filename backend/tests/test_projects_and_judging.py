@@ -879,3 +879,144 @@ def test_leaderboard_scoring_formula_and_ties(client: TestClient, db_session):
     assert res_public.status_code == 200
     assert len(res_public.json()) == 3
 
+
+
+# -----------------------------------------------------------------------------
+# Judge discovery (Backend_missing.md #3)
+# -----------------------------------------------------------------------------
+
+
+def test_my_judging_events_lists_assigned_events(client: TestClient):
+    """A judge discovers the events they were added to, without a direct link."""
+    s = setup_event_and_teams(client, min_team_size=2)
+    event_id = s["event_id"]
+    organizer = s["organizer"]
+
+    judge = auth_user(client, f"jdg_{s['suffix']}@example.com", f"jdg_{s['suffix']}")
+
+    # Before being added, the list is empty.
+    before = client.get("/api/v1/users/me/judging-events", headers=judge["headers"])
+    assert before.status_code == 200
+    assert before.json() == []
+
+    added = client.post(
+        f"/api/v1/events/{event_id}/judges",
+        json={"email": judge["user"]["email"]},
+        headers=organizer["headers"],
+    )
+    assert added.status_code == 201
+
+    res = client.get("/api/v1/users/me/judging-events", headers=judge["headers"])
+    assert res.status_code == 200
+    events = res.json()
+    assert len(events) == 1
+    assert events[0]["id"] == event_id
+    # Full EventRead shape, so the client can render a card.
+    assert events[0]["name"]
+    assert events[0]["status"]
+
+
+def test_my_judging_events_excludes_removed_judge(client: TestClient):
+    """Removing judging access drops the event from the judge's list."""
+    s = setup_event_and_teams(client, min_team_size=2)
+    event_id = s["event_id"]
+    organizer = s["organizer"]
+
+    judge = auth_user(client, f"jdg2_{s['suffix']}@example.com", f"jdg2_{s['suffix']}")
+    client.post(
+        f"/api/v1/events/{event_id}/judges",
+        json={"email": judge["user"]["email"]},
+        headers=organizer["headers"],
+    )
+    assert len(client.get("/api/v1/users/me/judging-events", headers=judge["headers"]).json()) == 1
+
+    removed = client.delete(
+        f"/api/v1/events/{event_id}/judges/{judge['user']['id']}",
+        headers=organizer["headers"],
+    )
+    assert removed.status_code == 204
+
+    after = client.get("/api/v1/users/me/judging-events", headers=judge["headers"])
+    assert after.status_code == 200
+    assert after.json() == []
+
+
+def test_my_judging_events_scoped_to_the_caller(client: TestClient):
+    """One judge never sees another judge's events."""
+    s = setup_event_and_teams(client, min_team_size=2)
+    event_id = s["event_id"]
+    organizer = s["organizer"]
+
+    judge_a = auth_user(client, f"jdga_{s['suffix']}@example.com", f"jdga_{s['suffix']}")
+    judge_b = auth_user(client, f"jdgb_{s['suffix']}@example.com", f"jdgb_{s['suffix']}")
+
+    client.post(
+        f"/api/v1/events/{event_id}/judges",
+        json={"email": judge_a["user"]["email"]},
+        headers=organizer["headers"],
+    )
+
+    assert len(client.get("/api/v1/users/me/judging-events", headers=judge_a["headers"]).json()) == 1
+    assert client.get("/api/v1/users/me/judging-events", headers=judge_b["headers"]).json() == []
+
+
+def test_my_judging_events_requires_auth(client: TestClient):
+    """Discovery endpoints are not public."""
+    assert client.get("/api/v1/users/me/judging-events").status_code == 401
+    assert client.get("/api/v1/users/me/mentoring-events").status_code == 401
+
+
+def test_my_mentoring_events_deduplicates_requests(client: TestClient, db_session):
+    """Several requests in one event yield one event entry, not N."""
+    from app.models.event import EventMembership
+
+    s = setup_event_and_teams(client, min_team_size=2)
+    event_id = s["event_id"]
+    organizer = s["organizer"]
+
+    mentor = auth_user(client, f"mnt_{s['suffix']}@example.com", f"mnt_{s['suffix']}")
+    # Register the mentor, then promote the membership to an approved mentor
+    # (there is no organizer endpoint that grants the mentor role directly).
+    register = client.post(
+        f"/api/v1/events/{event_id}/register", headers=mentor["headers"]
+    )
+    assert register.status_code == 201
+    membership = (
+        db_session.query(EventMembership)
+        .filter(
+            EventMembership.event_id == uuid.UUID(event_id),
+            EventMembership.user_id == uuid.UUID(mentor["user"]["id"]),
+        )
+        .first()
+    )
+    membership.role = "mentor"
+    membership.status = "approved"
+    db_session.commit()
+
+    # A participant raises two mentor requests; the organizer assigns both to the mentor.
+    first = client.post(
+        f"/api/v1/events/{event_id}/mentor-requests",
+        json={"topic": "Deployment help", "description": "Cannot deploy.", "priority": "normal"},
+        headers=s["member"]["headers"],
+    )
+    assert first.status_code == 201, first.text
+    second = client.post(
+        f"/api/v1/events/{event_id}/mentor-requests",
+        json={"topic": "API design", "description": "Need a review.", "priority": "low"},
+        headers=s["member"]["headers"],
+    )
+    assert second.status_code == 201, second.text
+
+    for request in (first.json(), second.json()):
+        assigned = client.patch(
+            f"/api/v1/mentor-requests/{request['id']}/assign",
+            json={"mentor_user_id": mentor["user"]["id"]},
+            headers=organizer["headers"],
+        )
+        assert assigned.status_code == 200, assigned.text
+
+    res = client.get("/api/v1/users/me/mentoring-events", headers=mentor["headers"])
+    assert res.status_code == 200
+    events = res.json()
+    assert len(events) == 1
+    assert events[0]["id"] == event_id

@@ -761,3 +761,167 @@ def test_disband_cancels_pending_invitations_and_preserves_history(client: TestC
         assert m.status == "left"
         assert m.left_at is not None
 
+
+# -----------------------------------------------------------------------------
+# My team for an event (Backend_missing.md #1)
+# -----------------------------------------------------------------------------
+
+
+def test_my_team_returns_the_callers_team(client: TestClient):
+    """A team member gets their own team back, including the roster."""
+    organizer = auth_user(client, "myt_org@example.com", "myt_org")
+    event_id = create_published_event(client, organizer["headers"], min_team_size=2, max_team_size=4)
+
+    p1 = auth_user(client, "myt_p1@example.com", "myt_p1")
+    p2 = auth_user(client, "myt_p2@example.com", "myt_p2")
+    register_participant(client, event_id, p1["headers"])
+    register_participant(client, event_id, p2["headers"])
+
+    team = client.post(
+        f"/api/v1/events/{event_id}/teams",
+        json={"name": "My Team Squad", "generate_join_code": True},
+        headers=p1["headers"],
+    ).json()
+
+    # The owner sees the team before anyone else joins.
+    res = client.get(f"/api/v1/events/{event_id}/my-team", headers=p1["headers"])
+    assert res.status_code == 200
+    body = res.json()
+    assert body["id"] == team["id"]
+    assert body["name"] == "My Team Squad"
+    assert body["event_id"] == event_id
+    assert body["member_count"] == 1
+    assert body["members"] is not None
+    assert body["members"][0]["user_id"] == p1["user"]["id"]
+    assert body["members"][0]["role"] == "owner"
+
+    # A second member resolves to the same team, with both roster entries.
+    join = client.post(
+        f"/api/v1/teams/{team['id']}/join",
+        json={"join_code": team["join_code"]},
+        headers=p2["headers"],
+    )
+    assert join.status_code == 200
+
+    res2 = client.get(f"/api/v1/events/{event_id}/my-team", headers=p2["headers"])
+    assert res2.status_code == 200
+    body2 = res2.json()
+    assert body2["id"] == team["id"]
+    assert body2["member_count"] == 2
+    assert {m["user_id"] for m in body2["members"]} == {
+        p1["user"]["id"],
+        p2["user"]["id"],
+    }
+
+
+def test_my_team_404_when_not_on_a_team(client: TestClient):
+    """A registered participant with no team gets a clean 404, not an empty body."""
+    organizer = auth_user(client, "myt_org2@example.com", "myt_org2")
+    event_id = create_published_event(client, organizer["headers"])
+
+    loner = auth_user(client, "myt_loner@example.com", "myt_loner")
+    register_participant(client, event_id, loner["headers"])
+
+    res = client.get(f"/api/v1/events/{event_id}/my-team", headers=loner["headers"])
+    assert res.status_code == 404
+    assert res.json()["detail"] == "You are not on a team for this event."
+
+
+def test_my_team_404_after_leaving(client: TestClient):
+    """Leaving a team removes it from my-team instead of returning a stale team.
+
+    The owner cannot leave without transferring ownership, so p2 joins first and
+    is the one who leaves.
+    """
+    organizer = auth_user(client, "myt_org3@example.com", "myt_org3")
+    event_id = create_published_event(
+        client, organizer["headers"], min_team_size=1, max_team_size=3
+    )
+
+    p1 = auth_user(client, "myt_p3@example.com", "myt_p3")
+    p2 = auth_user(client, "myt_p3b@example.com", "myt_p3b")
+    register_participant(client, event_id, p1["headers"])
+    register_participant(client, event_id, p2["headers"])
+
+    team = client.post(
+        f"/api/v1/events/{event_id}/teams",
+        json={"name": "Leaving Squad", "generate_join_code": True},
+        headers=p1["headers"],
+    ).json()
+    assert (
+        client.post(
+            f"/api/v1/teams/{team['id']}/join",
+            json={"join_code": team["join_code"]},
+            headers=p2["headers"],
+        ).status_code
+        == 200
+    )
+
+    assert (
+        client.get(f"/api/v1/events/{event_id}/my-team", headers=p2["headers"]).status_code
+        == 200
+    )
+
+    leave = client.post(f"/api/v1/teams/{team['id']}/leave", headers=p2["headers"])
+    assert leave.status_code == 200
+
+    res = client.get(f"/api/v1/events/{event_id}/my-team", headers=p2["headers"])
+    assert res.status_code == 404
+
+    # The owner is unaffected.
+    assert (
+        client.get(f"/api/v1/events/{event_id}/my-team", headers=p1["headers"]).status_code
+        == 200
+    )
+
+
+def test_my_team_ignores_disbanded_teams(client: TestClient):
+    """A disbanded team must not be reported as the caller's current team."""
+    organizer = auth_user(client, "myt_org4@example.com", "myt_org4")
+    event_id = create_published_event(
+        client, organizer["headers"], min_team_size=1, max_team_size=3
+    )
+
+    p1 = auth_user(client, "myt_p4@example.com", "myt_p4")
+    register_participant(client, event_id, p1["headers"])
+
+    team = client.post(
+        f"/api/v1/events/{event_id}/teams",
+        json={"name": "Doomed Squad"},
+        headers=p1["headers"],
+    ).json()
+
+    disband = client.post(f"/api/v1/teams/{team['id']}/disband", headers=p1["headers"])
+    assert disband.status_code == 200
+
+    res = client.get(f"/api/v1/events/{event_id}/my-team", headers=p1["headers"])
+    assert res.status_code == 404
+
+
+def test_my_team_is_scoped_per_event(client: TestClient):
+    """Being on a team in event A must not leak into event B."""
+    organizer = auth_user(client, "myt_org5@example.com", "myt_org5")
+    event_a = create_published_event(client, organizer["headers"], min_team_size=1, max_team_size=3)
+    event_b = create_published_event(client, organizer["headers"], min_team_size=1, max_team_size=3)
+
+    p1 = auth_user(client, "myt_p5@example.com", "myt_p5")
+    register_participant(client, event_a, p1["headers"])
+    register_participant(client, event_b, p1["headers"])
+
+    client.post(
+        f"/api/v1/events/{event_a}/teams",
+        json={"name": "Event A Squad"},
+        headers=p1["headers"],
+    )
+
+    assert client.get(f"/api/v1/events/{event_a}/my-team", headers=p1["headers"]).status_code == 200
+    assert client.get(f"/api/v1/events/{event_b}/my-team", headers=p1["headers"]).status_code == 404
+
+
+def test_my_team_requires_authentication(client: TestClient):
+    """The endpoint is not public."""
+    organizer = auth_user(client, "myt_org6@example.com", "myt_org6")
+    event_id = create_published_event(client, organizer["headers"])
+
+    res = client.get(f"/api/v1/events/{event_id}/my-team")
+    assert res.status_code == 401

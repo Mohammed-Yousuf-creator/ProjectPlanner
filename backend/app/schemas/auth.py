@@ -18,6 +18,9 @@ class LoginRequest(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+    # Long-lived, exchange-only credential for POST /auth/refresh.
+    refresh_token: str
+    expires_in: int
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -25,7 +28,13 @@ class TokenResponse(BaseModel):
 class AuthResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+    refresh_token: str
+    expires_in: int
     user: UserMeResponse
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str = Field(min_length=1)
 

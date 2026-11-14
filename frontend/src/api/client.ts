@@ -18,6 +18,33 @@ export const apiClient = axios.create({
 let accessToken: string | null = null;
 let unauthorizedHandler: ((message: string) => void) | null = null;
 
+/**
+ * Refresh plumbing.
+ *
+ * The store registers a refresher so this module does not import the store (that
+ * would create a cycle: store → client → store). When a request 401s we call it
+ * once, no matter how many requests failed together, then replay each failed
+ * request with the new token.
+ */
+type Refresher = () => Promise<string | null>;
+let refreshHandler: Refresher | null = null;
+let inFlightRefresh: Promise<string | null> | null = null;
+
+export function setRefreshHandler(handler: Refresher | null): void {
+  refreshHandler = handler;
+}
+
+/** Only one refresh runs at a time; every concurrent 401 awaits the same one. */
+function refreshAccessToken(): Promise<string | null> {
+  if (!refreshHandler) return Promise.resolve(null);
+  if (!inFlightRefresh) {
+    inFlightRefresh = refreshHandler().finally(() => {
+      inFlightRefresh = null;
+    });
+  }
+  return inFlightRefresh;
+}
+
 export function setAccessToken(token: string | null): void {
   accessToken = token;
 }
@@ -40,16 +67,44 @@ apiClient.interceptors.request.use((config) => {
 
 apiClient.interceptors.response.use(
   (response) => response,
-  (error: unknown) => {
-    if (axios.isAxiosError(error) && error.response?.status === 401) {
-      const url = error.config?.url ?? '';
-      // A failed sign-in is a form error, not an expired session.
-      const isAuthAttempt = url.includes('/auth/login') || url.includes('/auth/register');
-      if (!isAuthAttempt && unauthorizedHandler) {
+  async (error: unknown) => {
+    if (!axios.isAxiosError(error) || error.response?.status !== 401) {
+      return Promise.reject(error);
+    }
+
+    const config = error.config as (AxiosRequestConfig & { _retried?: boolean }) | undefined;
+    const url = config?.url ?? '';
+    // A failed sign-in is a form error, not an expired session; refreshing on it
+    // would loop forever because there is no valid session to renew.
+    const isAuthEndpoint = url.includes('/auth/login') || url.includes('/auth/register');
+    const isRefreshEndpoint = url.includes('/auth/refresh');
+
+    if (isAuthEndpoint || isRefreshEndpoint || config?._retried) {
+      // Give up: refresh failed or this request already tried once.
+      if (!isAuthEndpoint && !isRefreshEndpoint && unauthorizedHandler) {
         unauthorizedHandler('Session expired. Please sign in again.');
       }
+      return Promise.reject(error);
     }
-    return Promise.reject(error);
+
+    const renewed = await refreshAccessToken();
+    if (!renewed || !config) {
+      unauthorizedHandler?.('Session expired. Please sign in again.');
+      return Promise.reject(error);
+    }
+
+    // Publish the renewed token for the module too: the request interceptor
+    // stamps `accessToken`, so without this the replay would go out with the
+    // stale one it just replaced. The store's refresh handler also updates the
+    // store; keeping the module variable in sync here makes replay independent
+    // of how the handler was implemented.
+    accessToken = renewed;
+
+    // Replay the original request exactly once with the renewed token.
+    config._retried = true;
+    config.headers = config.headers ?? {};
+    (config.headers as Record<string, string>).Authorization = `Bearer ${renewed}`;
+    return apiClient.request(config);
   },
 );
 

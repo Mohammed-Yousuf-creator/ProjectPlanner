@@ -28,6 +28,14 @@ export function getEventTeams(
   });
 }
 
+/**
+ * GET /events/{event_id}/my-team - the caller's team in an event.
+ * 404 means "not on a team"; callers treat it as an expected answer.
+ */
+export function getMyTeamForEvent(eventId: string): Promise<TeamDetailRead> {
+  return request.get<TeamDetailRead>(`/events/${eventId}/my-team`);
+}
+
 export function getTeam(teamId: string): Promise<TeamDetailRead> {
   return request.get<TeamDetailRead>(`/teams/${teamId}`);
 }

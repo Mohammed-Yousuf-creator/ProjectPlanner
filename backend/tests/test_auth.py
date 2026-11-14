@@ -233,3 +233,119 @@ def test_suspended_users_cannot_authenticate(client: TestClient, db_session: Ses
     assert me_res.status_code == 403
     assert "suspended" in me_res.json()["detail"].lower()
 
+
+
+# -----------------------------------------------------------------------------
+# Refresh tokens (Backend_missing.md #4)
+# -----------------------------------------------------------------------------
+
+
+def _register(client: TestClient, suffix: str) -> dict:
+    res = client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": f"refresh_{suffix}@example.com",
+            "username": f"refresh_{suffix}",
+            "password": "SecurePassword123!",
+            "display_name": f"Refresh {suffix}",
+        },
+    )
+    assert res.status_code == 201, res.text
+    return res.json()
+
+
+def test_register_and_login_issue_refresh_tokens(client: TestClient):
+    """Both entry points return a refresh token and the access lifetime."""
+    suffix = uuid.uuid4().hex[:6]
+    body = _register(client, suffix)
+    assert body["refresh_token"]
+    assert body["expires_in"] > 0
+
+    login = client.post(
+        "/api/v1/auth/login",
+        json={"email": f"refresh_{suffix}@example.com", "password": "SecurePassword123!"},
+    )
+    assert login.status_code == 200
+    assert login.json()["refresh_token"]
+
+
+def test_refresh_rotates_tokens(client: TestClient):
+    """A refresh token yields a working new access token and a new refresh token."""
+    suffix = uuid.uuid4().hex[:6]
+    body = _register(client, suffix)
+    original_refresh = body["refresh_token"]
+
+    res = client.post("/api/v1/auth/refresh", json={"refresh_token": original_refresh})
+    assert res.status_code == 200, res.text
+    data = res.json()
+    assert data["access_token"]
+    assert data["refresh_token"]
+    assert data["refresh_token"] != original_refresh  # rotated
+
+    # The new access token authenticates against a protected endpoint.
+    me = client.get(
+        "/api/v1/users/me",
+        headers={"Authorization": f"Bearer {data['access_token']}"},
+    )
+    assert me.status_code == 200
+    assert me.json()["email"] == f"refresh_{suffix}@example.com"
+
+
+def test_access_token_is_not_accepted_as_refresh_token(client: TestClient):
+    """Token types are not interchangeable."""
+    suffix = uuid.uuid4().hex[:6]
+    body = _register(client, suffix)
+
+    res = client.post(
+        "/api/v1/auth/refresh",
+        json={"refresh_token": body["access_token"]},
+    )
+    assert res.status_code == 401
+    assert "refresh" in res.json()["detail"].lower()
+
+
+def test_refresh_token_is_not_accepted_as_access_token(client: TestClient):
+    """A refresh token cannot authenticate a normal API request."""
+    suffix = uuid.uuid4().hex[:6]
+    body = _register(client, suffix)
+
+    res = client.get(
+        "/api/v1/users/me",
+        headers={"Authorization": f"Bearer {body['refresh_token']}"},
+    )
+    assert res.status_code == 401
+
+
+def test_expired_refresh_token_is_rejected(client: TestClient):
+    """An expired refresh token returns 401 with a distinguishable message."""
+    from app.core.security import create_refresh_token
+
+    suffix = uuid.uuid4().hex[:6]
+    body = _register(client, suffix)
+    user_id = body["user"]["id"]
+
+    expired = create_refresh_token(subject=user_id, expires_delta=timedelta(seconds=-10))
+    res = client.post("/api/v1/auth/refresh", json={"refresh_token": expired})
+    assert res.status_code == 401
+    assert "expired" in res.json()["detail"].lower()
+
+
+def test_garbage_refresh_token_is_rejected(client: TestClient):
+    """Malformed input is a 401, never a 500."""
+    res = client.post("/api/v1/auth/refresh", json={"refresh_token": "not-a-jwt"})
+    assert res.status_code == 401
+
+
+def test_refresh_token_for_deleted_user_is_rejected(client: TestClient, db_session: Session):
+    """A refresh token for a user that no longer exists cannot mint an access token."""
+    suffix = uuid.uuid4().hex[:6]
+    body = _register(client, suffix)
+
+    user = db_session.execute(
+        select(User).where(User.username == f"refresh_{suffix}")
+    ).scalar_one()
+    db_session.delete(user)
+    db_session.commit()
+
+    res = client.post("/api/v1/auth/refresh", json={"refresh_token": body["refresh_token"]})
+    assert res.status_code == 401

@@ -6,6 +6,8 @@ from pydantic import BaseModel, ConfigDict
 
 
 class StoredFileRead(BaseModel):
+    """A stored file record, as returned by upload."""
+
     id: uuid.UUID
     team_id: uuid.UUID
     uploaded_by_user_id: uuid.UUID
@@ -17,3 +19,16 @@ class StoredFileRead(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+
+class TeamFileRead(StoredFileRead):
+    """A team file enriched for the team Files tab.
+
+    Adds who uploaded it and which chat message references it (if any), so the
+    client can group by uploader and deep-link back to the conversation without
+    fetching the whole message history.
+    """
+
+    uploaded_by_username: Optional[str] = None
+    uploaded_by_display_name: Optional[str] = None
+    # Null when the file was uploaded outside chat (e.g. a future task attachment).
+    message_id: Optional[uuid.UUID] = None

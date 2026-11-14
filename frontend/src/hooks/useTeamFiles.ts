@@ -1,8 +1,27 @@
-import { useMutation } from '@tanstack/react-query';
-import { uploadTeamFile } from '@/api/endpoints/teamFiles';
-import type { StoredFileRead } from '@/api/types';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { listTeamFiles, uploadTeamFile } from '@/api/endpoints/teamFiles';
+import type { StoredFileRead, TeamFileListParams } from '@/api/types';
+
+export const teamFileKeys = {
+  list: (teamId: string, params: TeamFileListParams) =>
+    ['team', teamId, 'files', params] as const,
+};
+
+/**
+ * Team files, newest first. Backed by `GET /teams/{id}/files`, so the Files tab
+ * no longer derives its list from chat messages.
+ */
+export function useTeamFiles(teamId: string | undefined, params: TeamFileListParams = {}) {
+  return useQuery({
+    queryKey: teamFileKeys.list(teamId ?? '', params),
+    queryFn: () => listTeamFiles(teamId as string, params),
+    enabled: Boolean(teamId),
+    retry: 0,
+  });
+}
 
 export function useUploadTeamFile(teamId: string) {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({
       file,
@@ -11,6 +30,9 @@ export function useUploadTeamFile(teamId: string) {
       file: File;
       onProgress?: (percent: number) => void;
     }): Promise<StoredFileRead> => uploadTeamFile(teamId, file, onProgress),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['team', teamId, 'files'] });
+    },
   });
 }
 

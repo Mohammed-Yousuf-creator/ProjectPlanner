@@ -8,6 +8,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { SkeletonCard, SkeletonLines } from '@/components/ui/Skeleton';
 import { EventMiniCard } from './EventMiniCard';
+import { RoleEventsPanel } from './RoleEventsPanel';
 import { useParticipantDashboard, useMyTeamInvitations } from '@/hooks/useParticipant';
 import { useAuthStore, getDisplayName } from '@/stores/authStore';
 import { useLogout } from '@/hooks/useAuth';
@@ -123,6 +124,8 @@ export function DashboardPage() {
           </div>
         ))}
       </section>
+
+      <RoleEventsPanel />
 
       {inviteCount > 0 && (
         <Alert

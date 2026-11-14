@@ -6,6 +6,7 @@ import {
   apiClient,
   getAccessToken,
   setAccessToken,
+  setRefreshHandler,
   setUnauthorizedHandler,
 } from '@/api/client';
 import { makeUser } from '@/test/factories';
@@ -148,5 +149,155 @@ describe('useAuthStore hook', () => {
   it('selects isAuthenticated from the token', () => {
     const { result } = renderHook(() => useAuthStore((state) => Boolean(state.accessToken)));
     expect(result.current).toBe(false);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Refresh tokens (Backend_missing.md #4)                                      */
+/* -------------------------------------------------------------------------- */
+
+describe('refresh token handling', () => {
+  const REFRESH_KEY = 'ep.refresh_token';
+
+  beforeEach(() => {
+    localStorage.clear();
+    setRefreshHandler(null);
+  });
+
+  afterEach(() => {
+    setRefreshHandler(null);
+    localStorage.clear();
+  });
+
+  it('persists both halves of the pair and clears both on logout', () => {
+    const store = useAuthStore.getState();
+    store.setTokens('access-1', 'refresh-1');
+
+    expect(localStorage.getItem(STORAGE_KEY)).toBe('access-1');
+    expect(localStorage.getItem(REFRESH_KEY)).toBe('refresh-1');
+    expect(useAuthStore.getState().accessToken).toBe('access-1');
+    expect(useAuthStore.getState().refreshToken).toBe('refresh-1');
+
+    useAuthStore.getState().clearSession();
+    expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+    expect(localStorage.getItem(REFRESH_KEY)).toBeNull();
+    expect(useAuthStore.getState().refreshToken).toBeNull();
+  });
+
+  it('replays the failed request after a successful refresh', async () => {
+    useAuthStore.setState({ accessToken: 'stale', refreshToken: 'refresh-1' });
+    setAccessToken('stale');
+
+    const refreshCalls: string[] = [];
+    const seenAuth: string[] = [];
+
+    setRefreshHandler(async () => {
+      refreshCalls.push('refresh');
+      return 'fresh';
+    });
+
+    let attempt = 0;
+    apiClient.defaults.adapter = async (config: InternalAxiosRequestConfig) => {
+      attempt += 1;
+      seenAuth.push(String(config.headers.Authorization ?? ''));
+      // First attempt: expired token. Replay: succeed.
+      if (attempt === 1) {
+        const response = {
+          status: 401,
+          statusText: '',
+          data: { detail: 'expired' },
+          headers: {},
+          config,
+        } as AxiosResponse;
+        throw new AxiosError('Unauthorized', 'ERR_BAD_REQUEST', config, undefined, response);
+      }
+      return { status: 200, statusText: '', data: { ok: true }, headers: {}, config } as AxiosResponse;
+    };
+
+    const response = await apiClient.get('/protected');
+    expect(response.data).toEqual({ ok: true });
+    expect(refreshCalls).toHaveLength(1);
+    // The replay carried the renewed token, not the stale one.
+    expect(seenAuth[0]).toBe('Bearer stale');
+    expect(seenAuth[1]).toBe('Bearer fresh');
+  });
+
+  it('only refreshes once for concurrent failures', async () => {
+    useAuthStore.setState({ accessToken: 'stale', refreshToken: 'refresh-1' });
+    setAccessToken('stale');
+
+    let refreshCount = 0;
+    setRefreshHandler(async () => {
+      refreshCount += 1;
+      return 'fresh';
+    });
+
+    const attempts = new Map<string, number>();
+    apiClient.defaults.adapter = async (config: InternalAxiosRequestConfig) => {
+      const key = String(config.url);
+      const count = (attempts.get(key) ?? 0) + 1;
+      attempts.set(key, count);
+      if (count === 1) {
+        const response = {
+          status: 401,
+          statusText: '',
+          data: {},
+          headers: {},
+          config,
+        } as AxiosResponse;
+        throw new AxiosError('Unauthorized', 'ERR_BAD_REQUEST', config, undefined, response);
+      }
+      return { status: 200, statusText: '', data: { key }, headers: {}, config } as AxiosResponse;
+    };
+
+    await Promise.all([
+      apiClient.get('/a'),
+      apiClient.get('/b'),
+      apiClient.get('/c'),
+    ]);
+
+    expect(refreshCount).toBe(1);
+  });
+
+  it('ends the session when refreshing fails', async () => {
+    useAuthStore.setState({ accessToken: 'stale', refreshToken: 'refresh-1' });
+    setAccessToken('stale');
+
+    const onUnauthorized = vi.fn();
+    setUnauthorizedHandler(onUnauthorized);
+    setRefreshHandler(async () => null); // expired / revoked refresh token
+
+    apiClient.defaults.adapter = async (config: InternalAxiosRequestConfig) => {
+      const response = {
+        status: 401,
+        statusText: '',
+        data: {},
+        headers: {},
+        config,
+      } as AxiosResponse;
+      throw new AxiosError('Unauthorized', 'ERR_BAD_REQUEST', config, undefined, response);
+    };
+
+    await expect(apiClient.get('/protected')).rejects.toBeInstanceOf(AxiosError);
+    expect(onUnauthorized).toHaveBeenCalledWith('Session expired. Please sign in again.');
+  });
+
+  it('never refreshes a failed sign-in attempt', async () => {
+    const refresh = vi.fn(async () => 'fresh');
+    setRefreshHandler(refresh);
+
+    apiClient.defaults.adapter = async (config: InternalAxiosRequestConfig) => {
+      const response = {
+        status: 401,
+        statusText: '',
+        data: { detail: 'Invalid email or password' },
+        headers: {},
+        config,
+      } as AxiosResponse;
+      throw new AxiosError('Unauthorized', 'ERR_BAD_REQUEST', config, undefined, response);
+    };
+
+    await expect(apiClient.post('/auth/login', {})).rejects.toBeInstanceOf(AxiosError);
+    expect(refresh).not.toHaveBeenCalled();
   });
 });
