@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-canvas font-sans text-ink antialiased selection:bg-selection-tint selection:text-rust;
+  }
+
+  *:focus-visible {
+    outline: none;
+  }
+}
