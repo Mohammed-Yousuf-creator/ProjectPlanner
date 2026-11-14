@@ -44,6 +44,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Exchange a refresh token for a new access token
+         * @description Rotate a refresh token into a fresh access/refresh pair.
+         *
+         *     Unauthenticated by design: the refresh token itself is the credential. A
+         *     revoked or expired token yields 401 and the client must sign in again.
+         */
+        post: operations["refresh_api_v1_auth_refresh_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/users/me": {
         parameters: {
             query?: never;
@@ -56,6 +79,49 @@ export interface paths {
          * @description Retrieve the currently authenticated user and their profile.
          */
         get: operations["get_current_user_profile_api_v1_users_me_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users/me/judging-events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List events the current user judges
+         * @description Events where the current user holds approved judging access.
+         *
+         *     Gives judges a discovery surface without requiring a direct link from an
+         *     organizer. Unpaginated: a user judges a handful of events.
+         */
+        get: operations["get_my_judging_events_api_v1_users_me_judging_events_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users/me/mentoring-events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List events the current user mentors
+         * @description Distinct events where a mentor request is assigned to the current user.
+         */
+        get: operations["get_my_mentoring_events_api_v1_users_me_mentoring_events_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -588,6 +654,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/events/{event_id}/my-team": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get the current user's team for an event
+         * @description Return the team the current user belongs to in this event.
+         *
+         *     Saves the client from probing every team in the event to discover whether the
+         *     caller has one. A 404 is an expected answer, not an error condition.
+         */
+        get: operations["get_my_event_team_api_v1_events__event_id__my_team_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/teams/{team_id}": {
         parameters: {
             query?: never;
@@ -935,7 +1024,14 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * List team files
+         * @description List files shared in the team, newest first. Active team members only.
+         *
+         *     Soft-deleted files are excluded. Each row names the uploader and, when the
+         *     file arrived as a chat attachment, the message that references it.
+         */
+        get: operations["list_files_api_v1_teams__team_id__files_get"];
         put?: never;
         /**
          * Upload image or video file
@@ -2143,6 +2239,10 @@ export interface components {
              * @default bearer
              */
             token_type: string;
+            /** Refresh Token */
+            refresh_token: string;
+            /** Expires In */
+            expires_in: number;
             user: components["schemas"]["UserMeResponse"];
         };
         /** Body_upload_file_api_v1_teams__team_id__files_post */
@@ -3448,6 +3548,11 @@ export interface components {
             /** Presentation Url */
             presentation_url?: string | null;
         };
+        /** RefreshRequest */
+        RefreshRequest: {
+            /** Refresh Token */
+            refresh_token: string;
+        };
         /** RegisterRequest */
         RegisterRequest: {
             /**
@@ -3970,7 +4075,10 @@ export interface components {
              */
             negotiation_messages: components["schemas"]["SponsorshipNegotiationMessageRead"][];
         };
-        /** StoredFileRead */
+        /**
+         * StoredFileRead
+         * @description A stored file record, as returned by upload.
+         */
         StoredFileRead: {
             /**
              * Id
@@ -4115,6 +4223,50 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+        };
+        /**
+         * TeamFileRead
+         * @description A team file enriched for the team Files tab.
+         *
+         *     Adds who uploaded it and which chat message references it (if any), so the
+         *     client can group by uploader and deep-link back to the conversation without
+         *     fetching the whole message history.
+         */
+        TeamFileRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Team Id
+             * Format: uuid
+             */
+            team_id: string;
+            /**
+             * Uploaded By User Id
+             * Format: uuid
+             */
+            uploaded_by_user_id: string;
+            /** Original Filename */
+            original_filename: string;
+            /** Mime Type */
+            mime_type: string;
+            /** Size Bytes */
+            size_bytes: number;
+            /** Checksum Sha256 */
+            checksum_sha256?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Uploaded By Username */
+            uploaded_by_username?: string | null;
+            /** Uploaded By Display Name */
+            uploaded_by_display_name?: string | null;
+            /** Message Id */
+            message_id?: string | null;
         };
         /** TeamInvitationDetailRead */
         TeamInvitationDetailRead: {
@@ -4466,6 +4618,10 @@ export interface components {
              * @default bearer
              */
             token_type: string;
+            /** Refresh Token */
+            refresh_token: string;
+            /** Expires In */
+            expires_in: number;
         };
         /** UserMeResponse */
         UserMeResponse: {
@@ -4621,6 +4777,39 @@ export interface operations {
             };
         };
     };
+    refresh_api_v1_auth_refresh_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RefreshRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TokenResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_current_user_profile_api_v1_users_me_get: {
         parameters: {
             query?: never;
@@ -4637,6 +4826,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserMeResponse"];
+                };
+            };
+        };
+    };
+    get_my_judging_events_api_v1_users_me_judging_events_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventRead"][];
+                };
+            };
+        };
+    };
+    get_my_mentoring_events_api_v1_users_me_mentoring_events_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventRead"][];
                 };
             };
         };
@@ -5608,6 +5837,44 @@ export interface operations {
             };
         };
     };
+    get_my_event_team_api_v1_events__event_id__my_team_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamDetailRead"];
+                };
+            };
+            /** @description The current user is not on a team for this event. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_team_api_v1_teams__team_id__get: {
         parameters: {
             query?: never;
@@ -6295,6 +6562,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TeamMessageRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_files_api_v1_teams__team_id__files_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                team_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamFileRead"][];
                 };
             };
             /** @description Validation Error */

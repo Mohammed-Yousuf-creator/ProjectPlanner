@@ -1,39 +1,35 @@
-import { useMemo, useState } from 'react';
-import { Download, FileWarning, FolderOpen, Upload } from 'lucide-react';
+import { useState } from 'react';
+import { Download, FolderOpen, MessageSquare, Upload } from 'lucide-react';
 import { Card, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { SkeletonTable } from '@/components/ui/Skeleton';
+import { Pagination } from '@/components/ui/Pagination';
 import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
 import { useToast } from '@/components/ui/Toast';
-import { useTeamMessages } from '@/hooks/useTeamMessages';
-import { useUploadTeamFile, validateTeamFile } from '@/hooks/useTeamFiles';
+import { useTeamFiles, useUploadTeamFile, validateTeamFile } from '@/hooks/useTeamFiles';
 import { downloadTeamFile } from '@/api/endpoints/teamFiles';
-import { formatBytes, formatDateTime, humanizeEnum } from '@/lib/format';
+import { DEFAULT_PAGE_SIZE } from '@/lib/constants';
+import { formatBytes, formatDateTime } from '@/lib/format';
 import { toApiError } from '@/lib/errors';
-import type { StoredFileRead, TeamDetailRead } from '@/api/types';
+import type { TeamDetailRead, TeamFileRead } from '@/api/types';
 
 /**
- * There is NO "list team files" endpoint (see Backend_missing.md), so this tab
- * only (a) uploads new files and (b) lists files discovered from chat
- * attachments. Nothing is invented.
+ * Team files.
+ *
+ * Backed by `GET /teams/{id}/files`, which returns every file the team has
+ * uploaded — not only those attached to the most recent chat messages — along
+ * with the uploader and the message that references it (when any).
  */
 export function TeamFilesTab({ team }: { team: TeamDetailRead }) {
   const toast = useToast();
   const [progress, setProgress] = useState<number | null>(null);
+  const [offset, setOffset] = useState(0);
   const uploadFile = useUploadTeamFile(team.id);
-  const messagesQuery = useTeamMessages(team.id, { limit: 100, offset: 0 });
 
-  const files = useMemo<StoredFileRead[]>(() => {
-    const seen = new Map<string, StoredFileRead>();
-    for (const message of messagesQuery.data ?? []) {
-      for (const file of message.attachments) {
-        if (!seen.has(file.id)) seen.set(file.id, file);
-      }
-    }
-    return [...seen.values()].sort((a, b) => b.created_at.localeCompare(a.created_at));
-  }, [messagesQuery.data]);
+  const filesQuery = useTeamFiles(team.id, { limit: DEFAULT_PAGE_SIZE, offset });
 
   const handleUpload = async (file: File) => {
     const validation = validateTeamFile(file);
@@ -47,7 +43,8 @@ export function TeamFilesTab({ team }: { team: TeamDetailRead }) {
       {
         onSuccess: (stored) => {
           setProgress(null);
-          toast.success(`${stored.original_filename} uploaded. Attach it to a chat message to share it.`);
+          setOffset(0);
+          toast.success(`${stored.original_filename} uploaded.`);
         },
         onError: (error) => {
           setProgress(null);
@@ -57,29 +54,68 @@ export function TeamFilesTab({ team }: { team: TeamDetailRead }) {
     );
   };
 
-  const columns: DataTableColumn<StoredFileRead>[] = [
+  const download = async (file: TeamFileRead) => {
+    try {
+      const blob = await downloadTeamFile(team.id, file.id);
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = file.original_filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    } catch (error) {
+      toast.error(toApiError(error).message);
+    }
+  };
+
+  const columns: DataTableColumn<TeamFileRead>[] = [
     {
       key: 'name',
       header: 'File',
       render: (row) => (
-        <div>
-          <p className="font-semibold text-ink">{row.original_filename}</p>
+        <div className="min-w-0">
+          <p className="truncate font-semibold text-ink">{row.original_filename}</p>
           <p className="font-mono text-[10px] uppercase tracking-wider text-muted">{row.mime_type}</p>
         </div>
       ),
-    },
-    {
-      key: 'size',
-      header: 'Size',
-      render: (row) => <span className="font-mono text-[11px] text-taupe">{formatBytes(row.size_bytes)}</span>,
     },
     {
       key: 'kind',
       header: 'Kind',
       render: (row) => (
         <span className="text-[11px] text-taupe">
-          {row.mime_type.startsWith('image/') ? 'Image' : 'Video'}
+          {row.mime_type.startsWith('image/')
+            ? 'Image'
+            : row.mime_type.startsWith('video/')
+              ? 'Video'
+              : 'File'}
         </span>
+      ),
+    },
+    {
+      key: 'size',
+      header: 'Size',
+      render: (row) => (
+        <span className="font-mono text-[11px] text-taupe">{formatBytes(row.size_bytes)}</span>
+      ),
+    },
+    {
+      key: 'uploader',
+      header: 'Uploaded by',
+      render: (row) => (
+        <div className="min-w-0">
+          <p className="truncate text-[11px] font-semibold text-ink">
+            {row.uploaded_by_display_name ?? row.uploaded_by_username ?? 'A teammate'}
+          </p>
+          {row.message_id && (
+            <p className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-wider text-muted">
+              <MessageSquare className="h-2.5 w-2.5" aria-hidden="true" />
+              In chat
+            </p>
+          )}
+        </div>
       ),
     },
     {
@@ -105,21 +141,7 @@ export function TeamFilesTab({ team }: { team: TeamDetailRead }) {
     },
   ];
 
-  const download = async (file: StoredFileRead) => {
-    try {
-      const blob = await downloadTeamFile(team.id, file.id);
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = file.original_filename;
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
-    } catch (error) {
-      toast.error(toApiError(error).message);
-    }
-  };
+  const files = filesQuery.data ?? [];
 
   return (
     <div className="space-y-4">
@@ -146,15 +168,18 @@ export function TeamFilesTab({ team }: { team: TeamDetailRead }) {
           {progress !== null && (
             <div className="min-w-[10rem] flex-1 space-y-1">
               <div className="h-1.5 w-full overflow-hidden rounded-lg bg-fill">
-                <div className="h-full rounded-lg bg-forest transition-all" style={{ width: `${progress}%` }} />
+                <div
+                  className="h-full rounded-lg bg-forest transition-all"
+                  style={{ width: `${progress}%` }}
+                />
               </div>
               <p className="font-mono text-[10px] text-muted">{progress}% uploaded</p>
             </div>
           )}
         </div>
-        <Alert tone="info" title="Files are shared through chat">
-          There is no standalone team file listing in the API. Uploaded files appear here once they
-          are attached to a chat message; upload, then attach the file when you post it.
+        <Alert tone="info" title="Attach files to a chat message to discuss them">
+          Uploading stores the file here. To notify teammates, attach it when you post in team
+          chat — files posted that way are tagged “In chat”.
         </Alert>
       </Card>
 
@@ -162,38 +187,39 @@ export function TeamFilesTab({ team }: { team: TeamDetailRead }) {
         <div className="border-b border-line-subtle p-5">
           <h3 className="text-sm font-bold text-ink">Shared files</h3>
           <p className="text-[11px] text-taupe">
-            Discovered from the last 100 chat messages ({humanizeEnum('attachments')}).
+            Every file this team has uploaded, newest first.
           </p>
         </div>
-        {messagesQuery.isLoading ? (
+
+        {filesQuery.isLoading ? (
           <div className="p-5">
             <SkeletonTable rows={4} />
           </div>
-        ) : messagesQuery.isError ? (
+        ) : filesQuery.isError ? (
           <div className="p-5">
-            <EmptyState
-              inline
-              icon={FileWarning}
-              title="Could not load shared files"
-              description={toApiError(messagesQuery.error).message}
-              actions={
-                <Button variant="outline" onClick={() => void messagesQuery.refetch()}>
-                  Retry
-                </Button>
-              }
-            />
+            <ErrorState error={filesQuery.error} onRetry={() => void filesQuery.refetch()} />
           </div>
         ) : files.length === 0 ? (
           <div className="p-5">
             <EmptyState
               inline
               icon={FolderOpen}
-              title="No files shared yet"
-              description="Upload a file and attach it to a chat message — it will be listed here."
+              title="No files yet"
+              description="Upload a design, screenshot or demo video to share it with the team."
             />
           </div>
         ) : (
-          <DataTable columns={columns} rows={files} rowKey={(row) => row.id} className="px-2 pb-2" />
+          <>
+            <DataTable columns={columns} rows={files} rowKey={(row) => row.id} className="px-2 pb-2" />
+            <div className="border-t border-line-subtle p-4">
+              <Pagination
+                offset={offset}
+                limit={DEFAULT_PAGE_SIZE}
+                pageItemCount={files.length}
+                onChange={setOffset}
+              />
+            </div>
+          </>
         )}
       </Card>
     </div>

@@ -832,3 +832,23 @@ def finalize_evaluation(
         updated_at=evaluation.updated_at,
         scores=score_reads,
     )
+
+
+def list_my_judging_events(db: Session, current_user: User) -> List[Event]:
+    """Return events where the current user holds active judging access.
+
+    Judging access is modelled as an `EventMembership` with role ``judge``, the
+    same row `list_event_judges` reads, so this surfaces exactly the events the
+    organizer roster says the user can judge.
+    """
+    return (
+        db.query(Event)
+        .join(EventMembership, EventMembership.event_id == Event.id)
+        .filter(
+            EventMembership.user_id == current_user.id,
+            EventMembership.role == "judge",
+            EventMembership.status == "approved",
+        )
+        .order_by(Event.starts_at.desc().nullslast(), Event.created_at.desc())
+        .all()
+    )

@@ -2,23 +2,9 @@ import { Link } from 'react-router-dom';
 import { Bell, Check } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { formatRelative, humanizeEnum } from '@/lib/format';
+import { resolveNotificationTarget } from '@/lib/notificationTarget';
 import type { NotificationRead } from '@/api/types';
 
-/**
- * Deep links are derived only from reference ids present in `NotificationRead.data`
- * (see Backend_missing.md). When no target can be determined the row is rendered
- * without a link instead of pointing somewhere arbitrary.
- */
-function resolveNotificationTarget(notification: NotificationRead): string | null {
-  const data = (notification.data ?? {}) as Record<string, unknown>;
-  const asString = (value: unknown) => (typeof value === 'string' ? value : null);
-
-  const proposalId = asString(data.proposal_id);
-  const dealId = asString(data.deal_id);
-  if (dealId) return `/sponsorship/deals/${dealId}`;
-  if (proposalId) return `/sponsorship/proposals/${proposalId}`;
-  return null;
-}
 
 export function NotificationItem({
   notification,

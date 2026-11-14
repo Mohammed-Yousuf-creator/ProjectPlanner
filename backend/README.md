@@ -317,6 +317,7 @@ UPLOAD_DIR=./data/uploads
 JWT_SECRET_KEY=your_generated_64_character_hex_secret_here
 JWT_ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
+REFRESH_TOKEN_EXPIRE_DAYS=14
 JWT_ISSUER=event-platform
 JWT_AUDIENCE=event-platform-users
 ```
@@ -332,8 +333,11 @@ JWT_AUDIENCE=event-platform-users
 | `JWT_SECRET_KEY` | string | *Required* | 256-bit cryptographically secure secret for HS256 HMAC signing. |
 | `JWT_ALGORITHM` | string | `HS256` | Token signing algorithm. |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | int | `30` | Lifespan of newly issued access tokens in minutes. |
+| `REFRESH_TOKEN_EXPIRE_DAYS` | int | `14` | Lifespan of refresh tokens in days. Long because they are only ever exchanged for a new pair. |
 | `JWT_ISSUER` | string | `event-platform` | Expected `iss` claim validated on incoming tokens. |
 | `JWT_AUDIENCE` | string | `event-platform-users` | Expected `aud` claim validated on incoming tokens. |
+| `CORS_ORIGINS` | string | `*` | Comma-separated browser origins allowed to call the API. Lock this down to the real frontend origin(s) in production. |
+| `CORS_ALLOW_CREDENTIALS` | bool | `false` | Keep `false` with Bearer-token auth; browsers reject `*` + credentials. |
 
 ---
 
@@ -516,9 +520,31 @@ curl http://127.0.0.1:8000/api/v1/health
 - **`GET /api/v1/health`**: Verifies service operational status and database connection.
 
 ### Authentication
-- **`POST /api/v1/auth/register`**: Register a new user and automatically create their user profile.
-- **`POST /api/v1/auth/login`**: Authenticate with email/password and receive a JWT access token.
+- **`POST /api/v1/auth/register`**: Register a new user, create their profile, and return
+  `{access_token, refresh_token, token_type, expires_in, user}`.
+- **`POST /api/v1/auth/login`**: Authenticate with email/password. Returns the same token
+  pair. Access tokens last `ACCESS_TOKEN_EXPIRE_MINUTES` (default 30).
+- **`POST /api/v1/auth/refresh`**: Exchange `{refresh_token}` for a **rotated** token pair.
+  Unauthenticated — the refresh token is itself the credential. Returns `401` for an
+  expired, revoked, deleted-user, or wrong-type token.
 - **`GET /api/v1/users/me`**: Return authenticated user information and profile.
+- **`GET /api/v1/users/me/judging-events`**: Events where the caller has approved judging
+  access (`EventMembership.role = "judge"`). Unpaginated — a user judges a few events.
+- **`GET /api/v1/users/me/mentoring-events`**: Distinct events where a mentor request is
+  assigned to the caller. De-duplicated across multiple requests in one event.
+
+#### Refresh token design
+Refresh tokens are **stateless**: the same signed JWT format as an access token, with a
+14-day lifetime (`REFRESH_TOKEN_EXPIRE_DAYS`) and a distinct `typ` claim. Type confusion is
+rejected in both directions:
+
+- `decode_access_token` throws `InvalidTokenError` when `typ == "refresh"`.
+- `decode_refresh_token` throws `InvalidTokenError` when `typ != "refresh"`.
+
+Tokens minted before the `typ` claim existed carry no value and are still accepted, so a
+rolling deploy does not sign every user out. There is no server-side revocation list;
+rotating `JWT_SECRET_KEY` invalidates all tokens. If per-session revocation is needed, add
+a `refresh_tokens` table keyed on the `jti` claim the token already carries.
 
 ### Organizations Management
 - **`POST /api/v1/organizations`**: Create an organization. Automatically sets creator as `owner`.
@@ -625,6 +651,12 @@ curl http://127.0.0.1:8000/api/v1/health
   - Assign or revoke `lead` role (`lead`, `member`). Restricted to team `owner`. Cannot modify owner role.
 - **`POST /api/v1/teams/{team_id}/transfer-ownership`**:
   - Transfer ownership to an active team member. Atomically updates old owner to `member` and target to `owner`. Exactly one active owner is maintained.
+- **`GET /api/v1/events/{event_id}/my-team`**:
+  - Returns the caller's team in the event as a full `TeamDetailRead` (roster included).
+  - `404 {"detail": "You are not on a team for this event."}` when the caller is not on
+    an active team — an expected answer, not an error.
+  - Disbanded teams and members with `status != active` are excluded. Scoped per event, so
+    the same user can resolve to different teams in different events.
 - **`POST /api/v1/teams/{team_id}/disband`**:
   - Disband team. Restricted to team `owner`. Sets team status to `disbanded`, marks active memberships as `left`, and cancels pending invitations. Disbanded teams cannot accept new members or invitations.
 
@@ -700,6 +732,13 @@ curl http://127.0.0.1:8000/api/v1/health
   - Multipart/form-data upload streamed in chunks to local disk under `UPLOAD_DIR/{team_id}/`.
   - Performs Pillow image open & verification and video container signature validation.
   - Computes SHA-256 checksum and saves metadata in `stored_files`. Cleans up partial files on error.
+- **`GET /api/v1/teams/{team_id}/files`**:
+  - Paginated listing (`limit` 1–100 default 50, `offset`) ordered newest first
+    (`created_at DESC, id DESC`). Restricted to active team members.
+  - Returns `TeamFileRead`: the stored-file fields plus `uploaded_by_username`,
+    `uploaded_by_display_name`, and `message_id` (null unless the file was posted as a
+    chat attachment).
+  - Soft-deleted files (`deleted_at` set) are excluded.
 - **`GET /api/v1/teams/{team_id}/files/{file_id}`**:
   - Download team file with safe `Content-Disposition` header. Restricted to active team members. Prevents cross-team IDOR access.
 
@@ -960,18 +999,21 @@ The test suite runs with `pytest` against an isolated temporary SQLite database:
 pytest -v
 ```
 
-Total tests: **93 passing** across 14 test modules:
-- `test_auth.py` (11 tests): Registration, duplicate checks, login, JWT validation, expiration, user me.
+Total tests: **121 passing** across 14 test modules:
+- `test_auth.py` (18 tests): Registration, duplicate checks, login, JWT validation,
+  expiration, user me, refresh-token issuance, rotation, expiry, deleted-user rejection,
+  and both directions of access/refresh type confusion.
 - `test_models.py` (8 tests): All 30 tables registered, foreign keys, unique & check constraints, relationships.
-- `test_health.py` (1 test): Health check & database ping.
+- `test_health.py` (4 tests): Health check, database ping, CORS preflight, and
+  `CORS_ORIGINS` parsing.
 - `test_organizations.py` (6 tests): Org CRUD, slug uniqueness, user org listing, invitations accept/reject, member removal.
 - `test_events.py` (6 tests): Event creation, draft visibility, publishing validation, public discovery filtering, cancelling.
 - `test_tracks.py` (3 tests): Track CRUD and uniqueness constraints.
 - `test_registrations.py` (8 tests): Participant registration, withdrawal, reactivation, timing boundaries, organizer check-in.
 - `test_participant_dashboard.py` (3 tests): Participant dashboard metrics, event categorization, registered event details.
 - `test_organizer_participants.py` (3 tests): Organizer participant roster, search/filter, status updates, check-in.
-- `test_teams.py` (14 tests): Team creation, lifecycle status transitions, join codes, team discovery, roster privacy, invitations, role updates, ownership transfer, disbanding, and capacity enforcement.
-- `test_team_collaboration.py` (11 tests): Tasks CRUD, status transitions, assignees replacement, persistent chat, attachments, WebSocket authentication, real-time broadcasts, file validation, oversized rejections, and disconnects on leave/disband.
-- `test_projects_and_judging.py` (8 tests): Project creation, single project per team constraint, submission versions, draft editing, submitted immutability, deadline & team size checks, judge management, criteria immutability, evaluation lifecycle, conflict of interest checks, leaderboard dynamic calculation, ties, and access control.
+- `test_teams.py` (20 tests): Team creation, lifecycle status transitions, join codes, team discovery, roster privacy, invitations, role updates, ownership transfer, disbanding, capacity enforcement, and `GET /events/{id}/my-team` (membership, 404, disbanded exclusion, non-member, leaving, auth).
+- `test_team_collaboration.py` (18 tests): Tasks CRUD, status transitions, assignees replacement, persistent chat, attachments, WebSocket authentication, real-time broadcasts, the typed `{type, data}` envelope contract, file validation, oversized rejections, disconnects on leave/disband, and the paginated team file listing.
+- `test_projects_and_judging.py` (13 tests): Project creation, single project per team constraint, submission versions, draft editing, submitted immutability, deadline & team size checks, judge management, criteria immutability, evaluation lifecycle, conflict of interest checks, leaderboard dynamic calculation, ties, access control, and judge/mentor event discovery (`/users/me/judging-events`, `/users/me/mentoring-events`).
 - `test_event_operations.py` (5 tests): Event schedule management, announcements & audience targeting, notifications privacy & unread tracking, check-in metrics & undo, mentor requests assignment & lifecycle.
 - `test_sponsorship_marketplace.py` (6 tests): Sponsor discovery, bidirectional listings, packages, proposals, negotiations & counteroffers, deals snapshotting, deliverable lifecycle, and notification dispatch.

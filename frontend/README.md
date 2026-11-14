@@ -4,7 +4,7 @@ React 19 + TypeScript + Vite single-page app for the FastAPI backend in `../back
 Styling follows `../DESIGN_SYSTEM.md` ("Editorial Warm Stone"); the build order and
 route table come from `../PLAN.md`.
 
-- **190** TypeScript modules · **69** page modules · **25** endpoint modules · **22** hooks
+- **191** TypeScript modules · **70** page modules · **25** endpoint modules · **24** hooks
 - **42** UI/domain/layout components, one component per file
 - Type-safe API layer generated from the backend's OpenAPI schema
 
@@ -137,11 +137,15 @@ frontend/
 `src/api/client.ts` is a single axios instance:
 
 - Base URL is relative (`/api/v1`), so the dev proxy and a production reverse proxy both work.
-- The access token lives **in memory** and is pushed in by `authStore`; only the token
-  string is persisted (`localStorage['ep.access_token']`).
-- A `401` on anything other than `/auth/login` or `/auth/register` invokes the
-  registered unauthorized handler, which clears the session and redirects to
-  `/login?next=…&expired=1`.
+- The access token lives **in memory** and is pushed in by `authStore`; the token pair is
+  persisted under `localStorage['ep.access_token']` / `['ep.refresh_token']`.
+- **Refresh on 401.** A `401` on anything other than `/auth/login`, `/auth/register` or
+  `/auth/refresh` triggers a single `POST /auth/refresh` (concurrent failures share one
+  in-flight request), then the original request is replayed once with the new token. If
+  refreshing fails — the refresh token is expired or revoked — the unauthorized handler
+  clears the session and redirects to `/login?next=…&expired=1`.
+- The store's `setRefreshHandler` is what `client.ts` calls; the indirection exists
+  because the store imports the client, so the client cannot import the store.
 - `cleanParams()` strips `undefined`/`''` so FastAPI's typed query params never receive
   an empty string.
 
@@ -210,7 +214,7 @@ never grant access — it can only produce a 403 that is rendered as an empty st
 npm run test
 ```
 
-**10 files, 95 tests.** Vitest + jsdom + React Testing Library.
+**12 files, 116 tests.** Vitest + jsdom + React Testing Library.
 `src/test/renderWithProviders.tsx` mounts any
 component inside the same providers the real app uses (react-query + toasts + router),
 and `src/test/factories.ts` provides typed fixtures whose timing defaults are relative
@@ -262,7 +266,7 @@ crashes on first render fails this test immediately.
 | --- | --- |
 | `Cannot reach the server` on every page | Backend is not running on `:8000`, or `VITE_API_PROXY_TARGET` is wrong. |
 | Everything 404s under `/api` | You opened the built `dist/` with a static server that does not proxy `/api`. |
-| Redirected to `/login?expired=1` after 30 minutes | Expected — there is no refresh token. Sign in again. |
+| Redirected to `/login?expired=1` | Expected when the refresh token has also expired (14 days) or was revoked. Otherwise the interceptor renews silently. |
 | WebSocket reconnects in a loop | Token is missing/expired; `1008` stops retries once the server actually rejects it. |
 | Types reference a field the backend does not send | Run `npm run api:types` against the current backend, then `npm run typecheck`. |
 | `npm run build` fails on `vite.config.ts` | The config is type-checked by `tsconfig.node.json`; keep `test` config inside `defineConfig` from `vitest/config`. |

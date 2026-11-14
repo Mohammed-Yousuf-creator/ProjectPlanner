@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Tuple
+from typing import List, Tuple
 
 from fastapi import HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
@@ -9,8 +9,9 @@ from sqlalchemy.orm import Session
 
 from app.models.stored_file import StoredFile
 from app.models.team import Team, TeamMember
+from app.models.team_message import TeamMessageAttachment
 from app.models.user import User
-from app.schemas.stored_file import StoredFileRead
+from app.schemas.stored_file import StoredFileRead, TeamFileRead
 from app.storage.local_storage import storage_provider
 
 
@@ -108,3 +109,55 @@ def download_team_file(
         content_disposition_type="attachment",
     )
 
+
+def list_team_files(
+    db: Session,
+    team_id: uuid.UUID,
+    current_user: User,
+    limit: int = 50,
+    offset: int = 0,
+) -> List[TeamFileRead]:
+    """List a team's files, newest first, with uploader and message linkage.
+
+    Soft-deleted files are excluded (matching `download_team_file`), and the
+    ordering is `(created_at DESC, id DESC)` so paging stays stable when several
+    files share a timestamp.
+    """
+    check_active_team_member(db, team_id, current_user.id)
+
+    rows = (
+        db.query(StoredFile, User, TeamMessageAttachment.message_id)
+        .join(User, User.id == StoredFile.uploaded_by_user_id)
+        .outerjoin(
+            TeamMessageAttachment, TeamMessageAttachment.file_id == StoredFile.id
+        )
+        .filter(
+            StoredFile.team_id == team_id,
+            StoredFile.deleted_at.is_(None),
+        )
+        .order_by(StoredFile.created_at.desc(), StoredFile.id.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+
+    results: List[TeamFileRead] = []
+    for stored, uploader, message_id in rows:
+        profile = uploader.profile
+        display_name = profile.display_name if profile else uploader.username
+        results.append(
+            TeamFileRead(
+                id=stored.id,
+                team_id=stored.team_id,
+                uploaded_by_user_id=stored.uploaded_by_user_id,
+                original_filename=stored.original_filename,
+                mime_type=stored.mime_type,
+                size_bytes=stored.size_bytes,
+                checksum_sha256=stored.checksum_sha256,
+                created_at=stored.created_at,
+                uploaded_by_username=uploader.username,
+                uploaded_by_display_name=display_name,
+                message_id=message_id,
+            )
+        )
+    return results

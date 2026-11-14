@@ -1,52 +1,20 @@
 import { useQuery } from '@tanstack/react-query';
-import { getTeam, getEventTeams } from '@/api/endpoints/teams';
+import { getMyTeamForEvent } from '@/api/endpoints/teams';
 import type { TeamDetailRead } from '@/api/types';
 import { useAuthStore } from '@/stores/authStore';
+import { toApiError } from '@/lib/errors';
 
 /**
- * KNOWN API GAP
- * ------------
- * The backend has no "get my team for this event" endpoint. `GET /teams/{id}`
- * returns `members: null` for non-members and the full roster for active
- * members, so this hook lists the event's teams and probes each one until it
- * finds the caller's team.
+ * The current user's team in an event.
  *
- * TODO(BACKEND-QUESTION): replace with a dedicated endpoint (see Backend_missing.md).
+ * Backed by `GET /events/{event_id}/my-team`, which answers the question in one
+ * request. A **404 is an expected answer** ("you are not on a team"), not an
+ * error, so the query resolves to `null` rather than surfacing a failure — every
+ * caller already branches on `data ?? null`.
  *
- * Guard rails: concurrency capped at 5, results cached per team for 60s, and a
- * 403/404 on a probe is treated as "not your team" rather than an error.
+ * This replaces the former workaround that listed the event's teams and probed
+ * each one until it found the caller's.
  */
-const CONCURRENCY = 5;
-
-async function findMyTeam(teamIds: string[], userId: string | undefined): Promise<TeamDetailRead | null> {
-  const queue = [...teamIds];
-  let found: TeamDetailRead | null = null;
-
-  async function worker(): Promise<void> {
-    while (queue.length > 0 && !found) {
-      const teamId = queue.shift();
-      if (!teamId) return;
-      try {
-        const detail = await getTeam(teamId);
-        if (!detail.members) continue;
-        const isMember = detail.members.some(
-          (member) =>
-            member.status === 'active' && (!userId || member.user_id === userId),
-        );
-        if (isMember) {
-          found = detail;
-          return;
-        }
-      } catch {
-        // 403/404 on a probe simply means this team is not ours.
-      }
-    }
-  }
-
-  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, teamIds.length) }, worker));
-  return found;
-}
-
 export function useMyTeamForEvent(eventId: string | undefined, enabled = true) {
   const userId = useAuthStore((state) => state.user?.id);
 
@@ -57,15 +25,12 @@ export function useMyTeamForEvent(eventId: string | undefined, enabled = true) {
     staleTime: 60_000,
     queryFn: async (): Promise<TeamDetailRead | null> => {
       try {
-        const teams = await getEventTeams(eventId as string, { limit: 100 });
-        if (teams.length === 0) return null;
-        return await findMyTeam(
-          teams.map((team) => team.id),
-          userId,
-        );
-      } catch {
-        // 403 = not a registered participant in this event.
-        return null;
+        return await getMyTeamForEvent(eventId as string);
+      } catch (error) {
+        const { status } = toApiError(error);
+        // Not on a team, or not an eligible participant: both mean "no team".
+        if (status === 404 || status === 403) return null;
+        throw error;
       }
     },
   });

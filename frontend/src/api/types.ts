@@ -77,6 +77,9 @@ export type TeamMessageRead = S['TeamMessageRead'];
 
 /* --------------------------------- files -------------------------------- */
 export type StoredFileRead = S['StoredFileRead'];
+/** Enriched file row for the team Files tab: uploader identity + message link. */
+export type TeamFileRead = S['TeamFileRead'];
+export type TeamFileListParams = { limit?: number; offset?: number };
 
 /* -------------------------------- projects ------------------------------ */
 export type ProjectCreate = S['ProjectCreate'];

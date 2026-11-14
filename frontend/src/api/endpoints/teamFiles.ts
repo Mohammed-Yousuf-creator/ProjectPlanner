@@ -1,5 +1,18 @@
-import { apiClient, request } from '../client';
-import type { StoredFileRead } from '../types';
+import { apiClient, cleanParams, request } from '../client';
+import type { StoredFileRead, TeamFileListParams, TeamFileRead } from '../types';
+
+/**
+ * GET /teams/{id}/files - paginated file listing, newest first.
+ * Active team members only; soft-deleted files are excluded by the server.
+ */
+export function listTeamFiles(
+  teamId: string,
+  params: TeamFileListParams = {},
+): Promise<TeamFileRead[]> {
+  return request.get<TeamFileRead[]>(`/teams/${teamId}/files`, {
+    params: cleanParams(params),
+  });
+}
 
 /**
  * POST /teams/{id}/files - multipart upload with progress reporting.

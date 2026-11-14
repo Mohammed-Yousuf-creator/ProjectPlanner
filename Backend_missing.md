@@ -3,33 +3,59 @@
 What the frontend needs from the backend, what it does **in the meantime**, and exactly
 how to implement each gap.
 
-> **Scope note.** This round was a frontend-only task (`PLAN.md`), so **no file under
-> `backend/` was modified**. Everything below is a request to backend owners. Every
-> frontend workaround is already implemented, tested, and documented in
-> `frontend/docs/OPEN_QUESTIONS.md` — so each item here can be closed without breaking
-> the UI.
+> **Status: gaps 1–7 are closed.** The original brief was frontend-only, so the first
+> version of this document was a request to backend owners. That scope was later
+> reversed, and gaps 1–7 have since been implemented in `backend/` with tests, and the
+> frontend workarounds removed. Gaps 8–12 remain open (all P3 polish) and are still
+> written as implementation requests.
+>
+> Backend test count went from **93 → 121** covering the closed gaps.
 
 **Legend** — **P1** blocks a core workflow · **P2** causes extra requests or missing
 convenience · **P3** polish.
 
-| # | Gap | Pri | Frontend workaround in use today |
-| --- | --- | --- | --- |
-| 1 | No `GET /events/{id}/my-team` | **P1** | Probe every team, cap concurrency at 5, cache 60 s |
-| 2 | No team file listing | **P1** | Derive the file list from the last 100 chat messages |
-| 3 | No "events I judge / mentor" | **P2** | Direct links only; 403 becomes an explanatory state |
-| 4 | No token refresh | **P2** | Hard redirect to `/login?expired=1`, unsaved work lost |
-| 5 | No CORS middleware | **P1** for production | Vite dev proxy keeps requests same-origin |
-| 6 | WS payload shapes undocumented | **P2** | Treat payloads as opaque, refetch over REST |
-| 7 | Notification deep-link targets undefined | **P2** | Link only deal/proposal notifications |
-| 8 | No global search | **P3** | Header search intentionally omitted |
-| 9 | No cross-event submission feed | **P3** | Per-event lists only |
-| 10 | `event_type` is free text | **P3** | Six suggestions via `<datalist>`, field stays open |
-| 11 | No listing text search | **P3** | Page-local filter, labelled as such |
-| 12 | Deal `event_id` filter has no picker source | **P3** | Plain "event id" text input |
+| # | Gap | Pri | Status | Where it lives now |
+| --- | --- | --- | --- | --- |
+| 1 | No `GET /events/{id}/my-team` | **P1** | ✅ **Closed** | `app/api/routes/teams.py`, `team_service.get_my_team_for_event` |
+| 2 | No team file listing | **P1** | ✅ **Closed** | `app/api/routes/team_files.py`, `file_service.list_team_files` |
+| 3 | No "events I judge / mentor" | **P2** | ✅ **Closed** | `app/api/routes/users.py` — `/users/me/judging-events`, `/users/me/mentoring-events` |
+| 4 | No token refresh | **P2** | ✅ **Closed** | `app/api/routes/auth.py` — `POST /auth/refresh`, `security.create_refresh_token` |
+| 5 | No CORS middleware | **P1** for production | ✅ **Closed** | `app/main.py` + `CORS_ORIGINS` in `app/core/config.py` |
+| 6 | WS payload shapes undocumented | **P2** | ✅ **Closed** | Envelope pinned by `test_websocket_broadcast_envelope_is_typed` |
+| 7 | Notification deep-link targets undefined | **P2** | ✅ **Closed** | `frontend/src/lib/notificationTarget.ts` maps every emitted type |
+| 8 | No global search | **P3** | ⬜ Open | Header search intentionally omitted |
+| 9 | No cross-event submission feed | **P3** | ⬜ Open | Per-event lists only |
+| 10 | `event_type` is free text | **P3** | ⬜ Open | Six suggestions via `<datalist>`, field stays open |
+| 11 | No listing text search | **P3** | ⬜ Open | Page-local filter, labelled as such |
+| 12 | Deal `event_id` filter has no picker source | **P3** | ⬜ Open | Plain "event id" text input |
+
+### What changed in the frontend
+
+| Gap | Workaround removed | Now |
+| --- | --- | --- |
+| 1 | `useMyTeamForEvent` probed up to N teams, 5 concurrent | One `GET /events/{id}/my-team`; 404 resolves to `null` |
+| 2 | `TeamFilesTab` scraped attachments from the last 100 chat messages | `useTeamFiles` → `GET /teams/{id}/files` with pagination + uploader attribution |
+| 3 | Judges/mentors reachable by direct link only | `RoleEventsPanel` on the dashboard via `useMyJudgingEvents` / `useMyMentoringEvents` |
+| 4 | Any 401 ended the session | Axios interceptor refreshes once (queued), replays the request, signs out only if refresh fails |
+| 7 | Only deal/proposal notifications linked | `resolveNotificationTarget` covers all 11 emitted types with an event-detail fallback |
 
 ---
 
-## 1. `GET /events/{event_id}/my-team` — P1
+## 1. `GET /events/{event_id}/my-team` — P1 ✅
+
+### As implemented
+
+`GET /api/v1/events/{event_id}/my-team` → `200 TeamDetailRead` (roster included, since
+the caller is by definition a member) or `404 {"detail": "You are not on a team for this event."}`.
+Disbanded teams and members with `status != active` are excluded; the lookup is scoped to
+the event, so the same user can be on different teams in different events.
+
+Implementation: `team_service.get_my_team_for_event` composes the existing
+`check_user_active_team_in_event` + `get_team_details`, so there is no duplicated
+membership logic. Tests: 6 in `tests/test_teams.py`.
+
+Frontend: `useMyTeamForEvent` now makes exactly one request and treats 404/403 as a
+legitimate "no team" answer. The probing code is deleted.
 
 ### Why it is needed
 Three screens need "the team I am on in this event": the event page (team CTA instead of
@@ -111,7 +137,20 @@ a user on a low-ranked team sees the "your team" state.
 
 ---
 
-## 2. `GET /teams/{team_id}/files` — P1
+## 2. `GET /teams/{team_id}/files` — P1 ✅
+
+### As implemented
+
+`GET /api/v1/teams/{team_id}/files?limit=50&offset=0` → `List[TeamFileRead]`, newest
+first (`created_at DESC, id DESC`). Soft-deleted files are excluded, `limit` is capped at
+100, and non-members get `403`. `TeamFileRead` extends `StoredFileRead` with
+`uploaded_by_username`, `uploaded_by_display_name` and `message_id` (null unless the file
+was posted as a chat attachment), so the UI can attribute each file without extra calls.
+
+Tests: 6 in `tests/test_team_collaboration.py`.
+
+Frontend: `TeamFilesTab` uses `useTeamFiles` with real pagination and an uploader column;
+the "derive from chat messages" scraping is deleted.
 
 ### Why it is needed
 The team workspace has a "Files" tab. Today there is no way to list files; the only way
@@ -186,7 +225,26 @@ to a task, are invisible.
 
 ---
 
-## 3. "Events I judge / mentor" — P2
+## 3. "Events I judge / mentor" — P2 ✅
+
+### As implemented
+
+Two endpoints on the users router:
+
+- `GET /api/v1/users/me/judging-events` → `List[EventRead]` — events where the caller has
+  `EventMembership.role == "judge"` and `status == "approved"` (the same rows
+  `GET /events/{id}/judges` reads, so the two views cannot disagree).
+- `GET /api/v1/users/me/mentoring-events` → `List[EventRead]` — distinct events where a
+  `MentorRequest.assigned_mentor_user_id` points at the caller. De-duplicated, because one
+  mentor is usually assigned several requests per event.
+
+Both are unpaginated by design: a person holds a handful of roles. Removing judging access
+(`DELETE /events/{id}/judges/{user_id}`) drops the event from the list immediately.
+
+Tests: 5 in `tests/test_projects_and_judging.py`.
+
+Frontend: `RoleEventsPanel` on the dashboard, driven by `useMyJudgingEvents` /
+`useMyMentoringEvents`. It renders nothing for a plain participant.
 
 ### Why it is needed
 Judges and mentors have no discovery surface. `GET /events` returns public events only,
@@ -229,7 +287,29 @@ as "Judge access required" rather than an error.
 
 ---
 
-## 4. Token refresh — P2
+## 4. Token refresh — P2 ✅
+
+### As implemented
+
+Stateless refresh tokens — a signed JWT with the same `sub`/`iss`/`aud` as an access token
+but a distinct `typ` claim and a 14-day lifetime (`REFRESH_TOKEN_EXPIRE_DAYS`).
+
+- `POST /api/v1/auth/register` and `POST /api/v1/auth/login` now return
+  `{access_token, refresh_token, token_type, expires_in}`.
+- `POST /api/v1/auth/refresh` takes `{refresh_token}` and returns a **rotated** pair.
+- Type confusion is impossible in both directions: `decode_access_token` rejects
+  `typ == "refresh"`, `decode_refresh_token` rejects `typ == "access"`. Tokens minted
+  before `typ` existed carry no value and are still accepted, so a rolling deploy does not
+  sign everyone out.
+
+Tests: 7 in `tests/test_auth.py`, including both confusion directions and a deleted user.
+
+**Known tradeoff:** stateless refresh means no server-side revocation list. Rotating
+`JWT_SECRET_KEY` invalidates everything at once; if per-session revocation is needed later,
+add a `refresh_tokens` table with a `jti` blocklist — the token already carries `jti`.
+
+Frontend: the axios interceptor refreshes once (concurrent 401s share a single in-flight
+refresh), replays the original request, and only ends the session when refreshing fails.
 
 ### Why it is needed
 Tokens expire in 30 minutes. There is no way to extend a session, so users are logged out
@@ -272,7 +352,23 @@ mid-workflow.
 
 ---
 
-## 5. CORS — P1 for any separate-origin deploy
+## 5. CORS — P1 for any separate-origin deploy ✅
+
+### As implemented
+
+`app/main.py` already registered `CORSMiddleware`; it is now settings-driven rather than
+hardcoded:
+
+```
+CORS_ORIGINS="https://app.example.com,https://admin.example.com"
+CORS_ALLOW_CREDENTIALS=false
+```
+
+The `"*"` default keeps local tooling working. `allow_credentials` stays `false` because
+authentication is Bearer-token based, not cookie based — which also avoids the `*` +
+credentials combination browsers reject outright.
+
+Tests: 3 in `tests/test_health.py` (preflight, actual request, and origin parsing).
 
 ### Why it is needed
 The API sends no `Access-Control-Allow-Origin`, so a browser cannot call it from a
@@ -316,7 +412,21 @@ is why the app works today.
 
 ---
 
-## 6. WebSocket payload shapes — P2
+## 6. WebSocket payload shapes — P2 ✅
+
+### As closed
+
+The payloads were already typed — `broadcast_sync(team_id, event_type, data)` emits
+`{"type": ..., "data": ...}` where `data` is the REST model (`model_dump(mode="json")`).
+The gap was that nothing pinned it, so a refactor could have changed the shape silently.
+
+`test_websocket_broadcast_envelope_is_typed` now asserts the envelope is exactly
+`{type, data}` and that `data` equals the POST response body field-for-field. Event types
+are `message.created|updated|deleted`, `task.created|updated|deleted`,
+`task.assignees.updated`, plus `authenticated` / `pong` control frames.
+
+Frontend: unchanged by design — `src/lib/ws.ts` forwards the event *type* only and lets
+react-query refetch, so payload changes cannot break the UI.
 
 ### Why it is needed
 `backend/README.md` §8 documents frame **types** and the authenticate handshake but not
@@ -353,7 +463,20 @@ invalidations, then REST refetches.
 
 ---
 
-## 7. Notification deep-link targets — P2
+## 7. Notification deep-link targets — P2 ✅
+
+### As closed
+
+The backend already supplied reference ids in `NotificationRead.data`
+(`proposal_id`, `deal_id`, `deliverable_id`, `mentor_request_id`, `event_id`). The gap was
+client-side: only deal and proposal notifications had a link.
+
+`frontend/src/lib/notificationTarget.ts` now resolves every emitted type, most-specific
+first: deal → proposal → mentor request → event-scoped page → event detail. Unknown types
+with an event id fall back to `/my/events/{id}`, and a notification with no usable id
+renders as plain text rather than a broken link.
+
+Tests: 9 in `frontend/src/lib/__tests__/notificationTarget.test.ts`.
 
 ### Why it is needed
 `NotificationRead` carries reference fields, but which reference types have routable
@@ -457,23 +580,48 @@ swap the input for a `Select` populated from that endpoint.
 
 ---
 
-## Verification checklist for backend changes
+## Verification checklist
 
-After implementing any item above:
+Run this after touching either side. It is what I ran to close gaps 1–7:
 
 ```bash
 cd backend
-.venv/bin/pytest -q                       # existing suite must stay green (93 tests)
+.venv/bin/pytest -q                    # 121 tests, 0 failures
 .venv/bin/uvicorn app.main:app --port 8000
 ```
 
 ```bash
 cd frontend
-npm run api:types      # regenerate schema.d.ts
-npm run typecheck      # catches every consumer of a renamed/moved field
-npm run test           # 67 tests, 9 files
-npm run build
+npm run api:types     # regenerate schema.d.ts from the running backend
+npm run typecheck     # catches every consumer of a renamed/moved field
+npm run lint          # 0 errors
+npm run test          # 116 tests, 12 files
+npm run build         # route-level splitting still intact
 ```
 
-Then remove the matching entry from `frontend/docs/OPEN_QUESTIONS.md` and the workaround
-named in the "Current workaround" section of that item.
+### Manual smoke test for the closed gaps
+
+```bash
+# 1. my-team answers 404 rather than "not found" for a non-member
+curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $TOKEN" \
+  http://127.0.0.1:8000/api/v1/events/$EVENT_ID/my-team
+
+# 2. refresh rotates and the new access token works
+curl -s -X POST http://127.0.0.1:8000/api/v1/auth/refresh \
+  -H 'Content-Type: application/json' \
+  -d "{\"refresh_token\":\"$REFRESH\"}"
+
+# 3. an access token is refused by /auth/refresh (expect 401)
+curl -s -o /dev/null -w '%{http_code}\n' -X POST \
+  http://127.0.0.1:8000/api/v1/auth/refresh \
+  -H 'Content-Type: application/json' -d "{\"refresh_token\":\"$ACCESS\"}"
+
+# 4. discovery endpoints answer for the right user only
+curl -s -H "Authorization: Bearer $TOKEN" \
+  http://127.0.0.1:8000/api/v1/users/me/judging-events
+```
+
+### Still open
+
+Gaps 8–12 are all P3 and do not block any workflow. Each entry above keeps the
+step-by-step implementation guide, so they can be picked up independently.

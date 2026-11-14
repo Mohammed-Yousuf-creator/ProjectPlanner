@@ -26,6 +26,7 @@ from app.services.team_service import (
     create_team,
     create_team_invitation,
     disband_team,
+    get_my_team_for_event,
     get_team_details,
     join_team_with_code,
     leave_team,
@@ -77,6 +78,28 @@ def get_event_teams(
 ) -> List[TeamDiscoveryItem]:
     """Return non-disbanded teams belonging to an event for eligible participants."""
     return list_event_teams(db, event_id, current_user, limit=limit, offset=offset)
+
+
+@router.get(
+    "/events/{event_id}/my-team",
+    response_model=TeamDetailRead,
+    status_code=status.HTTP_200_OK,
+    summary="Get the current user's team for an event",
+    responses={
+        404: {"description": "The current user is not on a team for this event."}
+    },
+)
+def get_my_event_team(
+    event_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> TeamDetailRead:
+    """Return the team the current user belongs to in this event.
+
+    Saves the client from probing every team in the event to discover whether the
+    caller has one. A 404 is an expected answer, not an error condition.
+    """
+    return get_my_team_for_event(db, event_id, current_user)
 
 
 # -----------------------------------------------------------------------------

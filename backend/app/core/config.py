@@ -13,8 +13,22 @@ class Settings(BaseSettings):
     JWT_SECRET_KEY: str = "replace_with_a_random_secret"
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    # Refresh tokens are long-lived but only ever exchanged; they must never be
+    # accepted as an access token, so they carry a distinct `typ` claim.
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 14
     JWT_ISSUER: str = "event-platform"
     JWT_AUDIENCE: str = "event-platform-users"
+
+    # Comma-separated list of allowed browser origins. The default "*" keeps the
+    # bundled Vite dev proxy and local tooling working out of the box; production
+    # deployments should set CORS_ORIGINS to the real frontend origin(s).
+    CORS_ORIGINS: str = "*"
+    CORS_ALLOW_CREDENTIALS: bool = False
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        """Parsed CORS_ORIGINS as a list, tolerating whitespace and blanks."""
+        return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
 
     model_config = SettingsConfigDict(
         env_file=(str(BACKEND_DIR / ".env"), ".env"),

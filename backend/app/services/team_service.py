@@ -57,6 +57,25 @@ def check_user_active_team_in_event(
     )
 
 
+def get_my_team_for_event(
+    db: Session, event_id: uuid.UUID, current_user: User
+) -> TeamDetailRead:
+    """Return the team the current user belongs to in this event.
+
+    Reuses `check_user_active_team_in_event` so the definition of "on a team"
+    stays identical to the join/create guards, then builds the full detail view
+    through `get_team_details` so the roster rules are not duplicated either.
+    """
+    membership = check_user_active_team_in_event(db, event_id, current_user.id)
+    if not membership:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="You are not on a team for this event.",
+        )
+
+    return get_team_details(db, membership.team_id, current_user)
+
+
 def count_active_members(db: Session, team_id: uuid.UUID) -> int:
     """Return count of active members for a given team."""
     return (

@@ -807,3 +807,198 @@ def test_websocket_disconnect_on_member_leave_and_team_disband(client: TestClien
         assert disc_msg["type"] == "disconnected"
         assert disc_msg["reason"] == "left_team"
 
+
+
+# -----------------------------------------------------------------------------
+# 2b. Team File Listing (Backend_missing.md #2)
+# -----------------------------------------------------------------------------
+
+
+def test_list_team_files_newest_first_with_uploader(client: TestClient, tmp_path: Path):
+    """Files are listed newest-first and name who uploaded them."""
+    setup = create_team_setup(client, tmp_path)
+    team_id = setup["team_id"]
+    owner = setup["owner"]
+    member = setup["member"]
+
+    first = client.post(
+        f"/api/v1/teams/{team_id}/files",
+        files={"file": ("first.png", generate_png_bytes(), "image/png")},
+        headers=owner["headers"],
+    )
+    assert first.status_code == 201
+
+    second = client.post(
+        f"/api/v1/teams/{team_id}/files",
+        files={"file": ("second.jpg", generate_jpeg_bytes(), "image/jpeg")},
+        headers=member["headers"],
+    )
+    assert second.status_code == 201
+
+    res = client.get(f"/api/v1/teams/{team_id}/files", headers=owner["headers"])
+    assert res.status_code == 200
+    files = res.json()
+    assert len(files) == 2
+    # Newest first.
+    assert files[0]["original_filename"] == "second.jpg"
+    assert files[1]["original_filename"] == "first.png"
+
+    # Uploader identity is resolved, not just a bare id.
+    assert files[0]["uploaded_by_user_id"] == member["user"]["id"]
+    assert files[0]["uploaded_by_username"] == member["user"]["username"]
+    assert files[0]["uploaded_by_display_name"]
+    assert files[1]["uploaded_by_user_id"] == owner["user"]["id"]
+
+    # Not an attachment yet, so no message link.
+    assert files[0]["message_id"] is None
+
+
+def test_list_team_files_links_chat_attachments(client: TestClient, tmp_path: Path):
+    """A file attached to a chat message reports the message id."""
+    setup = create_team_setup(client, tmp_path)
+    team_id = setup["team_id"]
+    owner = setup["owner"]
+    member = setup["member"]
+
+    upload = client.post(
+        f"/api/v1/teams/{team_id}/files",
+        files={"file": ("chart.png", generate_png_bytes(), "image/png")},
+        headers=member["headers"],
+    ).json()
+
+    message = client.post(
+        f"/api/v1/teams/{team_id}/messages",
+        json={"body": "Here is the chart", "attachment_ids": [upload["id"]]},
+        headers=member["headers"],
+    ).json()
+
+    res = client.get(f"/api/v1/teams/{team_id}/files", headers=owner["headers"])
+    assert res.status_code == 200
+    files = res.json()
+    assert len(files) == 1
+    assert files[0]["id"] == upload["id"]
+    assert files[0]["message_id"] == message["id"]
+
+
+def test_list_team_files_excludes_soft_deleted(client: TestClient, tmp_path: Path, db_session):
+    """Soft-deleted files never appear in the listing."""
+    setup = create_team_setup(client, tmp_path)
+    team_id = setup["team_id"]
+    owner = setup["owner"]
+
+    kept = client.post(
+        f"/api/v1/teams/{team_id}/files",
+        files={"file": ("kept.png", generate_png_bytes(), "image/png")},
+        headers=owner["headers"],
+    ).json()
+    dropped = client.post(
+        f"/api/v1/teams/{team_id}/files",
+        files={"file": ("dropped.png", generate_png_bytes(), "image/png")},
+        headers=owner["headers"],
+    ).json()
+
+    record = db_session.query(StoredFile).filter(StoredFile.id == uuid.UUID(dropped["id"])).first()
+    record.deleted_at = datetime.now(timezone.utc)
+    db_session.commit()
+
+    res = client.get(f"/api/v1/teams/{team_id}/files", headers=owner["headers"])
+    assert res.status_code == 200
+    ids = [f["id"] for f in res.json()]
+    assert kept["id"] in ids
+    assert dropped["id"] not in ids
+
+
+def test_list_team_files_requires_active_membership(client: TestClient, tmp_path: Path):
+    """Outsiders get 403; non-members can never enumerate a team's files."""
+    setup = create_team_setup(client, tmp_path)
+    team_id = setup["team_id"]
+    outsider = setup["outsider"]
+
+    res = client.get(f"/api/v1/teams/{team_id}/files", headers=outsider["headers"])
+    assert res.status_code == 403
+
+
+def test_list_team_files_404_for_unknown_team(client: TestClient, tmp_path: Path):
+    """An unknown team id is a 404, not an empty list."""
+    setup = create_team_setup(client, tmp_path)
+    owner = setup["owner"]
+
+    res = client.get(
+        f"/api/v1/teams/{uuid.uuid4()}/files", headers=owner["headers"]
+    )
+    assert res.status_code == 404
+
+
+def test_list_team_files_pagination_is_stable(client: TestClient, tmp_path: Path):
+    """Paging returns disjoint slices and enforces the limit cap."""
+    setup = create_team_setup(client, tmp_path)
+    team_id = setup["team_id"]
+    owner = setup["owner"]
+
+    for index in range(3):
+        upload = client.post(
+            f"/api/v1/teams/{team_id}/files",
+            files={"file": (f"p{index}.png", generate_png_bytes(), "image/png")},
+            headers=owner["headers"],
+        )
+        assert upload.status_code == 201
+
+    page_one = client.get(
+        f"/api/v1/teams/{team_id}/files?limit=2&offset=0", headers=owner["headers"]
+    ).json()
+    page_two = client.get(
+        f"/api/v1/teams/{team_id}/files?limit=2&offset=2", headers=owner["headers"]
+    ).json()
+
+    assert len(page_one) == 2
+    assert len(page_two) == 1
+    assert {f["id"] for f in page_one}.isdisjoint({f["id"] for f in page_two})
+
+    too_big = client.get(
+        f"/api/v1/teams/{team_id}/files?limit=101", headers=owner["headers"]
+    )
+    assert too_big.status_code == 422
+
+
+# -----------------------------------------------------------------------------
+# WebSocket payload contract (Backend_missing.md #6)
+# -----------------------------------------------------------------------------
+
+
+def test_websocket_broadcast_envelope_is_typed(client: TestClient, tmp_path: Path):
+    """Every broadcast is `{type, data}` where `data` is the same shape REST returns.
+
+    The frontend routes events by `type` and invalidates react-query caches, so a
+    changed envelope would silently break real-time updates. This test pins the
+    contract rather than the exact field list.
+    """
+    setup = create_team_setup(client, tmp_path)
+    team_id = setup["team_id"]
+    owner = setup["owner"]
+    member = setup["member"]
+
+    with client.websocket_connect(f"/api/v1/teams/{team_id}/ws") as ws:
+        ws.send_text(json.dumps({"type": "authenticate", "access_token": member["token"]}))
+        hello = json.loads(ws.receive_text())
+        assert hello["type"] == "authenticated"
+        assert set(hello) >= {"type", "user_id", "team_id"}
+
+        # Keep-alive round trip.
+        ws.send_text(json.dumps({"type": "ping"}))
+        assert json.loads(ws.receive_text()) == {"type": "pong"}
+
+        created = client.post(
+            f"/api/v1/teams/{team_id}/messages",
+            json={"body": "Contract check"},
+            headers=owner["headers"],
+        )
+        assert created.status_code == 201
+        rest_body = created.json()
+
+        event = json.loads(ws.receive_text())
+        # Exactly two top-level keys: the envelope is stable.
+        assert set(event) == {"type", "data"}
+        assert event["type"] == "message.created"
+        # The broadcast payload matches the REST representation field-for-field,
+        # so the client can cache it without a follow-up fetch.
+        assert event["data"] == rest_body
