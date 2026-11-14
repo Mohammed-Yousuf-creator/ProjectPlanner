@@ -206,76 +206,311 @@ The system comprises 30 relational tables:
 
 ---
 
-## 4. Environment Setup
+## 4. Environment & Dependency Setup
 
-### 1. Create and Activate Virtual Environment
+Follow these steps to prepare your Python environment, directory structure, and configuration.
 
-```bash
-# From the backend directory
+### 4.1 Prerequisites
+
+- **Python 3.12+** (tested and verified on Python 3.14).
+- **Git** (for repository clone and version control).
+- **SQLite 3** (bundled with Python standard library `sqlite3`).
+
+### 4.2 Create and Activate a Virtual Environment
+
+From the `backend/` directory, create and activate an isolated virtual environment:
+
+#### Windows PowerShell:
+```powershell
+# Navigate to the backend directory
+cd backend
+
+# Create virtual environment
 python -m venv .venv
 
-# On Windows PowerShell:
-.venv\Scripts\Activate.ps1
+# If script execution is restricted on your machine, enable it for this process:
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
 
-# On Linux/macOS:
+# Activate environment
+.venv\Scripts\Activate.ps1
+```
+
+#### Windows Command Prompt (CMD):
+```cmd
+cd backend
+python -m venv .venv
+.venv\Scripts\activate.bat
+```
+
+#### Linux / macOS (bash / zsh):
+```bash
+cd backend
+python3 -m venv .venv
 source .venv/bin/activate
 ```
 
-### 2. Install Dependencies
+> [!TIP]
+> Always verify that your active Python interpreter points to `.venv`:
+> - Windows: `Get-Command python` or `where python`
+> - Linux/macOS: `which python`
+
+### 4.3 Install Project Dependencies
+
+Upgrade `pip` and install all required libraries from `requirements.txt`:
 
 ```bash
+python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-### 3. Configure `.env` File
+### 4.4 Create Required Storage Directories
 
-Copy `.env.example` to `.env` if not already present:
+The backend stores the SQLite database at `data/app.db` and uploaded team files at `data/uploads/`. Create these directories before initializing the database or running the server:
 
+#### Windows PowerShell:
+```powershell
+New-Item -ItemType Directory -Force -Path "data\uploads"
+```
+
+#### Windows Command Prompt (CMD):
+```cmd
+mkdir data\uploads
+```
+
+#### Linux / macOS:
+```bash
+mkdir -p data/uploads
+```
+
+### 4.5 Configure Environment Variables (`.env`)
+
+Copy `.env.example` to `.env` in the `backend/` root:
+
+#### Windows PowerShell / Linux / macOS:
 ```bash
 cp .env.example .env
 ```
 
-Ensure `.env` contains a secure random key for JWT signing:
+#### Windows Command Prompt (CMD):
+```cmd
+copy .env.example .env
+```
+
+Generate a cryptographically secure 64-character secret key for JWT signing:
+
+```bash
+python -c "import secrets; print(secrets.token_hex(32))"
+```
+
+Update your `.env` file with the generated key and review the configuration:
 
 ```env
+# Application Settings
 APP_NAME=Event Platform API
 APP_ENV=development
-DATABASE_URL=sqlite:///./data/app.db
 
-JWT_SECRET_KEY=replace_with_a_64_character_hex_or_random_secret
+# Database & Storage
+DATABASE_URL=sqlite:///./data/app.db
+UPLOAD_DIR=./data/uploads
+
+# JWT Security
+JWT_SECRET_KEY=your_generated_64_character_hex_secret_here
 JWT_ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 JWT_ISSUER=event-platform
 JWT_AUDIENCE=event-platform-users
 ```
 
+#### Environment Variables Reference:
+
+| Variable | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `APP_NAME` | string | `Event Platform API` | Application title used in OpenAPI metadata. |
+| `APP_ENV` | string | `development` | Deployment environment (`development`, `testing`, `production`). |
+| `DATABASE_URL` | string | `sqlite:///./data/app.db` | SQLAlchemy connection URI. |
+| `UPLOAD_DIR` | string | `./data/uploads` | Filesystem destination for team file attachments and avatars. |
+| `JWT_SECRET_KEY` | string | *Required* | 256-bit cryptographically secure secret for HS256 HMAC signing. |
+| `JWT_ALGORITHM` | string | `HS256` | Token signing algorithm. |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | int | `30` | Lifespan of newly issued access tokens in minutes. |
+| `JWT_ISSUER` | string | `event-platform` | Expected `iss` claim validated on incoming tokens. |
+| `JWT_AUDIENCE` | string | `event-platform-users` | Expected `aud` claim validated on incoming tokens. |
+
 ---
 
-## 5. Running Database Migrations
+## 5. Database Setup & Alembic Migrations
 
-Alembic manages all schema creation and evolutions:
+The project uses **SQLAlchemy 2.x** with synchronous declarative mapping and **Alembic** to manage database schema creation, evolution, and versioning.
+
+### 5.1 Architecture & Configuration Overview
+
+- **`alembic.ini`**: Defines the migration script location (`alembic/`) and ensures the backend root is on `sys.path`.
+- **`alembic/env.py`**: Dynamically imports `settings.DATABASE_URL` from `app.core.config`, resolves the relative path to the backend directory, and imports `app.models` to register all 30 declarative models with `Base.metadata`.
+- **Batch Mode for SQLite**: `alembic/env.py` configures `render_as_batch=True`, enabling Alembic to safely perform table alterations, column additions, and constraint modifications on SQLite without locking or data loss.
+
+### 5.2 Step-by-Step Database Initialization
+
+#### Step 1: Run All Migrations to Head
+Execute the migration runner to build the entire database schema from scratch:
 
 ```bash
 alembic upgrade head
 ```
 
+Alembic will sequentially apply all 5 revisions:
+1. **`2c7c34c08b6b` (initial_schema)**: Creates core foundation tables: `users`, `user_profiles`, `organizations`, `organization_members`, `events`, `event_memberships`, `event_tracks`, `teams`, `team_members`, and `team_invitations`.
+2. **`7e31321756b8` (team_collaboration_tables)**: Adds collaboration tables: `team_tasks`, `team_task_assignees`, `team_messages`, `team_message_attachments`, and `stored_files`.
+3. **`a1e4180992a5` (projects_submissions_and_judging_tables)**: Adds project lifecycle and evaluation tables: `projects`, `project_submissions`, `judging_criteria`, `evaluations`, and `evaluation_scores`.
+4. **`fef8424c9c22` (event_operations_tables)**: Adds operational tables: `event_schedule_items`, `announcements`, `notifications`, and `mentor_requests`.
+5. **`c19a521b8e72` (sponsorship_marketplace_tables)**: Adds marketplace tables: `sponsorship_listings`, `sponsorship_packages`, `sponsorship_proposals`, `sponsorship_negotiation_messages`, `sponsorship_deals`, and `sponsorship_deliverables`.
+
+#### Step 2: Verify Current Migration Version
+Confirm that the database is synchronized with the latest head revision:
+
+```bash
+alembic current
+```
+*Expected Output:*
+```text
+c19a521b8e72 (head)
+```
+
+#### Step 3: Inspect Full Migration History
+View the complete lineage and revision descriptions:
+
+```bash
+alembic history --verbose
+```
+
+#### Step 4: Verify Database File & Integrity
+Verify that SQLite created the database file and passes integrity validation:
+
+```bash
+python -c "import sqlite3; con = sqlite3.connect('data/app.db'); print('Integrity:', con.execute('PRAGMA integrity_check;').fetchone()[0]); con.close()"
+```
+*Expected Output:*
+```text
+Integrity: ok
+```
+
+Verify that all **31 tables** (30 application tables + `alembic_version`) exist:
+
+```bash
+python -c "import sqlite3; con = sqlite3.connect('data/app.db'); cur = con.cursor(); cur.execute('SELECT name FROM sqlite_master WHERE type=\'table\' AND name NOT LIKE \'sqlite_%\''); tables = [r[0] for r in cur.fetchall()]; print(f'Total tables: {len(tables)}'); print(', '.join(sorted(tables)))"
+```
+*Expected Output:*
+```text
+Total tables: 31
+alembic_version, announcements, evaluation_scores, evaluations, event_memberships, event_schedule_items, event_tracks, events, judging_criteria, mentor_requests, notifications, organization_members, organizations, project_submissions, projects, sponsorship_deals, sponsorship_deliverables, sponsorship_listings, sponsorship_negotiation_messages, sponsorship_packages, sponsorship_proposals, stored_files, team_invitations, team_members, team_message_attachments, team_messages, team_task_assignees, team_tasks, teams, user_profiles, users
+```
+
+### 5.3 Useful Developer Migration Commands
+
+- **Roll back one revision:**
+  ```bash
+  alembic downgrade -1
+  ```
+- **Roll back to a specific revision:**
+  ```bash
+  alembic downgrade 2c7c34c08b6b
+  ```
+- **Roll back entire schema to empty state:**
+  ```bash
+  alembic downgrade base
+  ```
+- **Autogenerate a new migration after modifying SQLAlchemy models:**
+  ```bash
+  alembic revision --autogenerate -m "describe_your_changes_here"
+  ```
+- **Reset and rebuild database completely:**
+  ```bash
+  # Delete database file and re-run migrations:
+  # Windows PowerShell:
+  Remove-Item -Force data\app.db; alembic upgrade head
+
+  # Linux/macOS:
+  rm -f data/app.db && alembic upgrade head
+  ```
+
 ---
 
-## 6. Starting the FastAPI Server
+## 6. Library Setup & Verification
 
-Start the application with Uvicorn:
+The backend relies on key security, imaging, and ASGI networking libraries. Verify that these libraries and their underlying C extensions are properly compiled and operational in your environment.
+
+### 6.1 `pwdlib[argon2]` (Password Hashing)
+- **Role:** Handles salted, memory-hard Argon2id password hashing and constant-time verification for user passwords and team join codes.
+- **Verification Command:**
+  ```bash
+  python -c "from app.core.security import hash_password, verify_password; h = hash_password('SecureSecret123!'); assert verify_password('SecureSecret123!', h); print('[OK] Argon2 password hashing verified.')"
+  ```
+- *Expected Output:* `[OK] Argon2 password hashing verified.`
+
+### 6.2 `PyJWT` (JWT Authentication Engine)
+- **Role:** Signs and decodes HS256 authentication tokens, validating cryptographic signatures, token expiration (`exp`), issuer (`iss`), and audience (`aud`) claims.
+- **Verification Command:**
+  ```bash
+  python -c "import uuid; from app.core.security import create_access_token, decode_access_token; uid = uuid.uuid4(); token = create_access_token(uid, extra_claims={'email': 'test@example.com'}); payload = decode_access_token(token); assert payload['sub'] == str(uid); print('[OK] PyJWT authentication verified.')"
+  ```
+- *Expected Output:* `[OK] PyJWT authentication verified.`
+
+### 6.3 `Pillow` (Image Processing & Validation)
+- **Role:** Used in team file uploads (`app/api/routes/team_files.py`) to inspect image file headers, validate actual image formats (PNG, JPEG, GIF, WEBP), and prevent malicious or corrupted file uploads.
+- **Verification Command:**
+  ```bash
+  python -c "import PIL.Image; print(f'[OK] Pillow image engine verified (version: {PIL.Image.__version__}).')"
+  ```
+- *Expected Output:* `[OK] Pillow image engine verified (version: ...).`
+
+### 6.4 `pydantic-settings` (Environment Configuration)
+- **Role:** Loads and strictly validates `.env` configuration keys into strongly-typed application settings at startup.
+- **Verification Command:**
+  ```bash
+  python -c "from app.core.config import settings; print(f'[OK] Configuration loaded: {settings.APP_NAME} | Env: {settings.APP_ENV} | DB: {settings.DATABASE_URL}')"
+  ```
+- *Expected Output:* `[OK] Configuration loaded: Event Platform API | Env: development | DB: sqlite:///./data/app.db`
+
+### 6.5 `Uvicorn` & `WebSockets` (Real-Time Communication)
+- **Role:** High-performance ASGI server supporting HTTP/1.1 and RFC 6455 WebSockets for the live team collaboration chat endpoint (`/api/v1/teams/{team_id}/messages/ws`).
+- **Verification Command:**
+  ```bash
+  python -c "import uvicorn, websockets; print('[OK] Uvicorn and WebSockets ready.')"
+  ```
+- *Expected Output:* `[OK] Uvicorn and WebSockets ready.`
+
+---
+
+## 7. Starting the FastAPI Server
+
+Start the application with Uvicorn in development mode:
 
 ```bash
 uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-- **Interactive API Documentation (Swagger UI):** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
-- **ReDoc Documentation:** [http://127.0.0.1:8000/redoc](http://127.0.0.1:8000/redoc)
-- **OpenAPI Schema:** [http://127.0.0.1:8000/openapi.json](http://127.0.0.1:8000/openapi.json)
+### 7.1 Verify Health Endpoint
+In a separate terminal, test that the service is running and connected to SQLite:
+
+```bash
+curl http://127.0.0.1:8000/api/v1/health
+```
+
+*Expected JSON Response:*
+```json
+{
+  "status": "healthy",
+  "database": "connected",
+  "timestamp": "2026-11-14T02:00:00.000000Z"
+}
+```
+
+### 7.2 Interactive API Documentation
+- **Swagger UI (Interactive API Explorer):** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+- **ReDoc (Detailed Specifications):** [http://127.0.0.1:8000/redoc](http://127.0.0.1:8000/redoc)
+- **OpenAPI Schema (Raw JSON):** [http://127.0.0.1:8000/openapi.json](http://127.0.0.1:8000/openapi.json)
 
 ---
 
-## 7. API Endpoints Documentation
+## 8. API Endpoints Documentation
 
 ### Health Check
 - **`GET /api/v1/health`**: Verifies service operational status and database connection.
@@ -717,7 +952,7 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 
 ---
 
-## 8. Running the Test Suite
+## 9. Running the Test Suite
 
 The test suite runs with `pytest` against an isolated temporary SQLite database:
 
