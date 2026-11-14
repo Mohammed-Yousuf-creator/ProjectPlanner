@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
+import { useAppForm } from '@/hooks/useAppForm';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -52,7 +52,7 @@ export function CreateOrganizationPage() {
     handleSubmit,
     setError,
     formState: { errors },
-  } = useForm<FormValues>({
+  } = useAppForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
       name: '',

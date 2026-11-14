@@ -24,6 +24,7 @@ export function EventWorkspaceNav({
     { to: `${base}/schedule`, label: 'Schedule' },
     { to: `${base}/teams`, label: 'Teams', requiresAuth: true },
     { to: `${base}/projects`, label: 'Projects', requiresAuth: true },
+    { to: `${base}/matchmaking`, label: 'Matchmaking', requiresAuth: true },
     { to: `${base}/leaderboard`, label: 'Leaderboard' },
     { to: `${base}/announcements`, label: 'Announcements', requiresAuth: true },
     { to: `${base}/mentor`, label: 'Mentor desk', requiresAuth: true },

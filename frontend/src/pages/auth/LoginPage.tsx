@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
+import { useAppForm } from '@/hooks/useAppForm';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Field } from '@/components/ui/Field';
@@ -44,7 +44,7 @@ export function LoginPage() {
     handleSubmit,
     setError,
     formState: { errors },
-  } = useForm<LoginForm>({
+  } = useAppForm<LoginForm>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: '', password: '' },
   });

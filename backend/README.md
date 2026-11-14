@@ -989,6 +989,72 @@ a `refresh_tokens` table keyed on the `jti` claim the token already carries.
   - Automatically records `completed_at` timestamp upon entering `completed` status.
   - Dispatches `sponsorship_deliverable_completed` or `sponsorship_deliverable_rejected` in-app notifications.
 
+### Phase 9: AI Features (Assistant, Summaries, Matchmaking)
+
+All AI features are **optional and degrade gracefully**. With `GEMINI_API_KEY`
+empty the server still serves every endpoint: the assistant answers from a
+keyword matcher, summaries are extracted from the submission text, and
+matchmaking is unaffected (it never used a model). Responses always carry a
+`source` of `gemini` or `fallback` so the client can label them honestly.
+
+Configuration (see `.env.example`):
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `GEMINI_API_KEY` | *(empty)* | Enables live generation. |
+| `GEMINI_MODEL` | `gemini-2.5-flash` | Model for chat and summaries. |
+| `GEMINI_API_BASE` | Google endpoint | Override for a proxy. |
+| `GEMINI_TIMEOUT_SECONDS` | `30` | Per-request timeout. |
+| `GEMINI_MAX_OUTPUT_TOKENS` | `1024` | Caps generation length. |
+
+**`GET /api/v1/ai/status`** *(unauthenticated)*
+Reports `ai_enabled`, the configured `model` (`null` when no key is set), and
+per-feature availability. The client uses `ai_enabled` to choose between the
+"AI" and "Offline answer" labels.
+
+**Skills** — the input to matchmaking.
+- **`GET /api/v1/users/me/skills`** / **`PUT /api/v1/users/me/skills`**: read and
+  replace your whole skill set. The PUT is a full replacement: labels are
+  trimmed, de-duplicated case-insensitively (`React.js` and `react` merge, keeping
+  the first spelling and the higher proficiency), blanks dropped. More than 50
+  skills or a proficiency outside 1–5 is a 422.
+- **`GET /api/v1/users/{user_id}/skills`**: another user's skills.
+
+**Matchmaking** — a deterministic algorithm in `app/services/skill_matching.py`,
+not a model. Each skill is weighted by rarity (`1 / (1 + holders)`), a candidate
+scores the weight of the skills they bring that you lack, and shared skills incur
+an `OVERLAP_PENALTY` of `0.6` so near-duplicates rank last. Ties break
+alphabetically, so ranking is reproducible.
+- **`GET /api/v1/events/{event_id}/matchmaking/teammates`**: registered
+  participants ranked against you.
+- **`GET /api/v1/events/{event_id}/matchmaking/teams`**: open teams ranked by what
+  you would add.
+- **`POST /api/v1/events/{event_id}/matchmaking/preview`**: rank against a
+  hypothetical skill set without saving it.
+
+**Assistant**
+- **`GET /api/v1/ai/conversations`** / **`POST /api/v1/ai/conversations`**: list and
+  create conversations.
+- **`GET | DELETE /api/v1/ai/conversations/{id}`**: read history or delete.
+- **`POST /api/v1/ai/conversations/{id}/messages`**: send a message; returns both
+  turns. History is capped at 20 turns per request, 50 conversations per user
+  (the oldest is pruned).
+- **`POST /api/v1/ai/chat`**: one-shot message without persisting a conversation.
+
+Conversations are owner-only — another user's id returns 404, not 403, so their
+existence is not disclosed. The user's turn is persisted **before** generation, so
+a provider failure never loses what they typed.
+
+**Summaries**
+- **`GET /api/v1/submissions/{submission_id}/summary`**: cached overview with `tldr`,
+  `technologies`, `highlights` and `talking_points`. Pass `?refresh=true` to
+  regenerate.
+- **`GET /api/v1/events/{event_id}/ai/overview`**: organizer-only digest across
+  every submitted project, reporting how many were `generated` vs `cached`.
+
+A draft submission is visible only to its owning team. Submitted work is visible
+to the owning team, the organization's owner/admin, and approved judges/mentors.
+
 ---
 
 ## 9. Running the Test Suite

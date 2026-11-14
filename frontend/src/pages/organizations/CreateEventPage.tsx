@@ -1,5 +1,5 @@
 import { useNavigate, useParams } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
+import { useAppForm } from '@/hooks/useAppForm';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -70,7 +70,7 @@ export function CreateEventPage() {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<FormValues>({
+  } = useAppForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
       name: '',

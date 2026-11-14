@@ -8,6 +8,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base, UTCDateTime
 
 if TYPE_CHECKING:
+    from app.models.ai import UserSkill
     from app.models.event import EventMembership
     from app.models.notification import Notification
     from app.models.organization import OrganizationMember
@@ -76,6 +77,12 @@ class User(Base):
         "TeamMember",
         back_populates="user",
         cascade="all, delete-orphan",
+    )
+    skills: Mapped[List["UserSkill"]] = relationship(
+        "UserSkill",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        order_by="UserSkill.name",
     )
     notifications: Mapped[List["Notification"]] = relationship(
         "Notification",

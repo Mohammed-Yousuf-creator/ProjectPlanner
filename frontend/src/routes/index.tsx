@@ -31,6 +31,9 @@ const CreateEventPage = lazyPage(() => import('@/pages/organizations/CreateEvent
 const OrgSponsorshipPage = lazyPage(() => import('@/pages/sponsorship/OrgSponsorshipPage'), 'OrgSponsorshipPage');
 const ManageEventPage = lazyPage(() => import('@/pages/manage/ManageEventPage'), 'ManageEventPage');
 const JudgeWorkspacePage = lazyPage(() => import('@/pages/judge/JudgeWorkspacePage'), 'JudgeWorkspacePage');
+const AssistantPage = lazyPage(() => import('@/pages/assistant/AssistantPage'), 'AssistantPage');
+const MySkillsPage = lazyPage(() => import('@/pages/participant/MySkillsPage'), 'MySkillsPage');
+const EventMatchmakingPage = lazyPage(() => import('@/pages/events/EventMatchmakingPage'), 'EventMatchmakingPage');
 const SponsorsPage = lazyPage(() => import('@/pages/sponsors/SponsorsPage'), 'SponsorsPage');
 const MarketplacePage = lazyPage(() => import('@/pages/marketplace/MarketplacePage'), 'MarketplacePage');
 const ListingDetailPage = lazyPage(() => import('@/pages/marketplace/ListingDetailPage'), 'ListingDetailPage');
@@ -95,6 +98,9 @@ export const router = createBrowserRouter([
       { path: 'organizations/:orgId/sponsorship', element: <OrgSponsorshipPage /> },
       { path: 'manage/events/:eventId', element: <ManageEventPage /> },
       { path: 'judge/events/:eventId', element: <JudgeWorkspacePage /> },
+      { path: 'assistant', element: <AssistantPage /> },
+      { path: 'my/skills', element: <MySkillsPage /> },
+      { path: 'events/:eventId/matchmaking', element: <EventMatchmakingPage /> },
       { path: 'sponsorship/proposals/:proposalId', element: <ProposalPage /> },
       { path: 'sponsorship/deals/:dealId', element: <DealPage /> },
     ],

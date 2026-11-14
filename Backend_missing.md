@@ -9,7 +9,13 @@ how to implement each gap.
 > frontend workarounds removed. Gaps 8–12 remain open (all P3 polish) and are still
 > written as implementation requests.
 >
-> Backend test count went from **93 → 121** covering the closed gaps.
+> Backend test count went from **93 → 121** covering the closed gaps, then to **171**
+> with the AI features (`test_ai_features.py`, `test_skill_matching.py`).
+>
+> **AI features (later addition):** the assistant, submission summaries and
+> skill-based matchmaking now live in the backend too — `app/api/routes/ai.py`,
+> `app/services/{gemini_client,skill_matching,skill_service,ai_chat_service,submission_summary_service}.py`.
+> All of them degrade gracefully when `GEMINI_API_KEY` is empty.
 
 **Legend** — **P1** blocks a core workflow · **P2** causes extra requests or missing
 convenience · **P3** polish.

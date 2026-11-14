@@ -1,3 +1,4 @@
+from app.models.ai import AiConversation, AiMessage, SubmissionSummary, UserSkill
 from app.models.announcement import Announcement
 from app.models.event import Event, EventMembership, EventTrack
 from app.models.event_schedule import EventScheduleItem
@@ -22,6 +23,10 @@ from app.models.user import User, UserProfile
 
 __all__ = [
     "User",
+    "UserSkill",
+    "AiConversation",
+    "AiMessage",
+    "SubmissionSummary",
     "UserProfile",
     "Organization",
     "OrganizationMember",

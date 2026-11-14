@@ -55,6 +55,13 @@ export function SubmissionPanel({
   });
   const [confirmSubmit, setConfirmSubmit] = useState(false);
 
+  // Seed the editor when the *version* changes, not on every render of the
+  // query result. Depending on `latest` (an object) re-ran every time react-query
+  // handed back a new identity on a background refetch, which silently wiped
+  // whatever the user was typing. `latest?.id` is the real identity of a draft,
+  // and `latest?.updated_at` covers the case where the server changed the same
+  // version (e.g. after a successful save).
+  const latestKey = `${latest?.id ?? 'none'}:${latest?.updated_at ?? ''}`;
   useEffect(() => {
     setForm({
       title: latest?.title ?? '',
@@ -65,7 +72,8 @@ export function SubmissionPanel({
       demo_url: latest?.demo_url ?? '',
       presentation_url: latest?.presentation_url ?? '',
     });
-  }, [latest?.id, latest]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [latestKey]);
 
   const historyColumns: DataTableColumn<ProjectSubmissionRead>[] = [
     {

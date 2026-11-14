@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
+import { useAppForm } from '@/hooks/useAppForm';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Field } from '@/components/ui/Field';
@@ -47,7 +47,7 @@ export function RegisterPage() {
     handleSubmit,
     setError,
     formState: { errors },
-  } = useForm<RegisterForm>({
+  } = useAppForm<RegisterForm>({
     resolver: zodResolver(registerSchema),
     defaultValues: { display_name: '', username: '', email: '', password: '' },
   });

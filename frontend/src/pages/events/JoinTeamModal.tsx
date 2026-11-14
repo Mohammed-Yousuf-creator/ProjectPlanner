@@ -1,4 +1,4 @@
-import { useForm } from 'react-hook-form';
+import { useAppForm } from '@/hooks/useAppForm';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Modal } from '@/components/ui/Modal';
@@ -33,7 +33,7 @@ export function JoinTeamModal({
     handleSubmit,
     reset,
     formState: { errors },
-  } = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: { join_code: '' } });
+  } = useAppForm<FormValues>({ resolver: zodResolver(schema), defaultValues: { join_code: '' } });
 
   const apiError = join.error ? toApiError(join.error) : null;
 

@@ -26,7 +26,7 @@ import { formatDate, humanizeEnum } from '@/lib/format';
 import { toApiError } from '@/lib/errors';
 import type { TeamDetailRead, TeamMemberInfo, TeamMemberRead } from '@/api/types';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
+import { useAppForm } from '@/hooks/useAppForm';
 import { z } from 'zod';
 
 const inviteSchema = z.object({
@@ -64,7 +64,7 @@ export function TeamOverviewTab({
     handleSubmit,
     reset,
     formState: { errors },
-  } = useForm<InviteForm>({ resolver: zodResolver(inviteSchema), defaultValues: { invitee_email: '' } });
+  } = useAppForm<InviteForm>({ resolver: zodResolver(inviteSchema), defaultValues: { invitee_email: '' } });
 
   const roster = team.members ?? [];
   const activeMembers = roster.filter((member) => member.status === 'active');
