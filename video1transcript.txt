@@ -1,0 +1,436 @@
+Chapter 1: Overview
+0:00
+0 seconds
+Today I'm sharing with you my complete process for planning coding projects.
+0:04
+4 seconds
+This is the same system that I use whether I'm building a YouTube tutorial, creating a client application, or working on my own side projects.
+0:12
+12 seconds
+And here's the thing.
+0:13
+13 seconds
+Most developers jump straight into code without proper planning, and that's where the projects get messy. Scope creep starts to happen, and you end up rebuilding the same thing multiple times.
+0:23
+23 seconds
+Now, I've learned this the hard way.
+0:25
+25 seconds
+After wasting countless hours on projects that could have been done in half the time, had I done better planning. And that's why I'm making this video.
+0:32
+32 seconds
+So over the next ten minutes, I'm going to walk you through my nine step planning process. That takes me from a vague idea to a clear roadmap that I can actually execute.
+0:42
+42 seconds
+Now, this isn't just theoretical. This is exactly what I do for every single project. It's saved me hundreds of hours of development time.
+0:50
+50 seconds
+And if you like this video and you're looking to become a software engineer shortly, I just want to let you know that I do have a free developer training. I'm going to leave a link to that in the description.
+0:58
+58 seconds
+So make sure that you check that out. Anyways, let's move on to step number one which is to start from your goal. Okay.
+Chapter 2: Step 1
+1:05
+1 minute, 5 seconds
+So the first step is getting crystal clear on three things. Why am I making this project. Who is this project for and what is going to make it valuable?
+1:15
+1 minute, 15 seconds
+Now this is going to sound obvious, but most people actually skip this step and then they wonder why their project feels completely directionless later.
+1:22
+1 minute, 22 seconds
+Now, I always write down my answers to these questions, or at least think about them really deeply in my mind.
+1:28
+1 minute, 28 seconds
+So, for example, when I create a YouTube tutorial, like many on this channel, my goal is to build something digestible that contains features to help you guys learn the best while building a solid foundation that you can expand upon.
+1:40
+1 minute, 40 seconds
+I don't care about making the project massive or adding all of these different features. I want to give a solid base that someone can learn a lot and then extend it.
+1:48
+1 minute, 48 seconds
+And that means that I emphasize clean, understandable code over showing off kind of these advanced, you know, funny techniques. Right?
+1:56
+1 minute, 56 seconds
+But when I'm building a project for a client, for example, the goal is much different. It needs to work flawlessly. It needs to be thoroughly tested.
+2:03
+2 minutes, 3 seconds
+It has to have a clean design, and more importantly, it needs to solve their specific business problem.
+2:08
+2 minutes, 8 seconds
+So I'm the same developer with a completely different approach to a project because the goal is different. So your goal determines every decision you're going to make later.
+2:16
+2 minutes, 16 seconds
+Your tech stack, your features, even how you write the code. So if you get this wrong, then everything else is going to become harder.
+2:22
+2 minutes, 22 seconds
+So please nail down the why and be 100% clear. It can be a hobby project for fun, a startup idea.
+2:30
+2 minutes, 30 seconds
+You want to scale a portfolio project, it doesn't matter, but you need to know why you're building this project. So the next steps actually make sense.
+Chapter 3: Step 2
+2:38
+2 minutes, 38 seconds
+Okay, so step number two is to write user stories. Now once I know my goal of the project I write simple user stories.
+2:46
+2 minutes, 46 seconds
+These are statements that describe what the users are able to do with my application. Now I keep these incredibly basic like the user should be able to upload a file.
+2:55
+2 minutes, 55 seconds
+The user should be able to create an account. The user should be able to view a dashboard. Whatever, right? I'm trying to list out all of the things the user is going to use my application for.
+3:05
+3 minutes, 5 seconds
+Now notice at this point I'm not getting technical.
+3:08
+3 minutes, 8 seconds
+I'm not saying the user should be able to upload files via a Rest API endpoint with validation authentication. No, that comes later.
+3:15
+3 minutes, 15 seconds
+Right now what I'm doing is just capturing what needs to happen from the user's perspective. Now this is referred to as user centric design.
+3:23
+3 minutes, 23 seconds
+And from my experience, thinking this way forces you to put the user at the heart of all of your decisions and not get carried away trying to get too technical too fast.
+3:32
+3 minutes, 32 seconds
+Now, I usually end up with about 10 to 20 user stories for a typical project.
+3:36
+3 minutes, 36 seconds
+Some are core functionality, others may be nice to haves, but the point is, I'm getting everything out of my head and onto paper or onto the computer so I can have a full picture of what it is that I'm actually building.
+3:48
+3 minutes, 48 seconds
+Now, this step alone prevents those moments, multiple weeks into development, where you realize you forgot about user authentication or file management, or some other critical feature.
+3:57
+3 minutes, 57 seconds
+So really the main point here is write down exactly what a user should be able to do and how the app is going to work for them. Okay, so quick pause here.
+4:05
+4 minutes, 5 seconds
+Before we dive in further, I want to introduce you to manage Engine Site 24 seven, today's sponsor and a powerful observability platform with industry leading infrastructure or monitoring capabilities.
+4:17
+4 minutes, 17 seconds
+In today's fast moving I.T. landscape, maintaining seamless infrastructure performance is critical to business success.
+4:24
+4 minutes, 24 seconds
+Now, site 24 seven gives you deep visibility across your entire IT stack, from on premise servers and VMs to cloud instances and containerized workloads.
+4:34
+4 minutes, 34 seconds
+Now built for hybrid and rapidly evolving environments, it monitors vital performance metrics like CPU, memory, disk usage, and network traffic so you can detect issues early and prevent costly disruptions.
+4:47
+4 minutes, 47 seconds
+Now, what sets site 24 seven apart is how it centralizes observability across diverse environments into a single, unified dashboard.
+4:55
+4 minutes, 55 seconds
+Whether you're running traditional infrastructure or cloud native services, you get a clear view of system health, performance, trends, and resource utilization.
+5:04
+5 minutes, 4 seconds
+If you're looking to take control of your infrastructure and stay ahead of downtime, then click the link in the description to learn more about Manage Engine Site 24 seven and evaluate the product for free.
+5:15
+5 minutes, 15 seconds
+Okay, so with that said, let's move on to step number three, which is to define your data models.
+Chapter 4: Step 3
+5:21
+5 minutes, 21 seconds
+So what I do here is I think through all of the data that my application is going to have, and this is completely stack agnostic.
+5:28
+5 minutes, 28 seconds
+I'm not thinking about MongoDB versus Postgres yet.
+5:31
+5 minutes, 31 seconds
+I'm just figuring out what information I need to store, how it relates to the other data, and what those relationships look like.
+5:38
+5 minutes, 38 seconds
+Now, at the end of the day, all software does is just move data around, present it, store it, etc.
+5:44
+5 minutes, 44 seconds
+so it's extremely important to get the data right before you dive into the tech stack or do anything too technical.
+5:50
+5 minutes, 50 seconds
+Now, if we think of like a simple blog, for example, we might have a user's model post models, a comment model.
+5:56
+5 minutes, 56 seconds
+For example, users may have many posts, posts may have many comments, comments belong to users and to different posts.
+6:03
+6 minutes, 3 seconds
+So what I do is I sketch out these different relationships, and I think about what fields each model actually needs. Now this doesn't need to be perfect.
+6:11
+6 minutes, 11 seconds
+And I'm not trying to define SQL tables here.
+6:13
+6 minutes, 13 seconds
+I'm just trying to understand at a very high level what data my app actually needs and how I'm going to store that.
+6:20
+6 minutes, 20 seconds
+Now, this exercise catches so many issues early on for me.
+6:23
+6 minutes, 23 seconds
+Maybe I realized that I need a category model that I hadn't thought of, or that my user model needs some more fields. And it's not just a name and an email.
+6:30
+6 minutes, 30 seconds
+It's much easier to fix these problems on paper before you've actually built out your database schemas, and you have real production data. All right.
+Chapter 5: Step 4
+6:38
+6 minutes, 38 seconds
+So step four is to nail an MVP or a minimum viable product. Now at this stage I become ruthless.
+6:45
+6 minutes, 45 seconds
+I go through everything that I just planned and I pretty much remove half of it.
+6:49
+6 minutes, 49 seconds
+So I look at all of my user stories or all of the features that I'm thinking about, and I ask this question, do I absolutely need this for my app to function?
+6:57
+6 minutes, 57 seconds
+Now, if the answer is no, I cut it out. I get rid of it. Now, this is probably the hardest step because every feature seems important, right?
+7:04
+7 minutes, 4 seconds
+Especially when you're excited about a project. But scope creep kills more projects than bad code ever will.
+7:10
+7 minutes, 10 seconds
+And your MVP should be the absolute minimum version that still provides value to users.
+7:16
+7 minutes, 16 seconds
+So, for example, a task management app, the MVP, might just be creating tasks, marking them as complete, and deleting tasks. That's it.
+7:23
+7 minutes, 23 seconds
+No categories, no due dates, no collaboration features, no fancy dashboards. Those can come later than come in version 2 or 3.
+7:31
+7 minutes, 31 seconds
+But the point is, you want to build the smallest possible thing that you can.
+7:35
+7 minutes, 35 seconds
+So the MVP forces you to focus on what actually matters, what gets you to a working prototype fast and doesn't overwhelm you.
+7:42
+7 minutes, 42 seconds
+So now we move on to step number five, which for me is to draw a stupid simple prototype or very basic wireframe of the application.
+Chapter 6: Step 5
+7:51
+7 minutes, 51 seconds
+Now, I'm not talking about going into Figma here or doing something fancy.
+7:54
+7 minutes, 54 seconds
+What I literally do is I grab a piece of paper, or I take my iPad out with the Apple Pencil, and I sketch the world's ugliest wireframe that you've probably ever seen, because my artistic skills are at that level of like maybe a grade four.
+8:06
+8 minutes, 6 seconds
+So anyways, I'm talking about stick figures here. Basic rectangles. Nothing fancy at all. I don't worry about the colors, the fonts. I don't even care if it looks good.
+8:14
+8 minutes, 14 seconds
+I'm just trying to understand a very basic layout of what it is that I'm trying to make, and kind of a flow of how the user is going to use my application.
+8:22
+8 minutes, 22 seconds
+So where does the login form go? What happens after someone uploads a file? How do I navigate between the different pages? I'm doing something super, super basic.
+8:31
+8 minutes, 31 seconds
+More so so that I can just walk through my thought process and visualize it out. And then I have something that I can look at when I'm coding.
+8:38
+8 minutes, 38 seconds
+So this step for me catches a ton of user experience issues before I write any code.
+8:42
+8 minutes, 42 seconds
+And it makes me realize things like if my navigation doesn't make sense, if there's too many things to click through. And again, I just try to go as simple as I possibly can.
+8:51
+8 minutes, 51 seconds
+I quote that I've heard is that paper is cheap, but code is expensive. So use as much paper as you need so that you can write the least amount of code. So at this stage here step five.
+9:00
+9 minutes
+For me, I have a pretty good idea of what I actually want to build for my project. I have the user stories. I have a basic wireframe mapped out.
+9:08
+9 minutes, 8 seconds
+I know the kind of data that I'm going to need to store. And now step six again is a little bit of a thought exercise here. And this is to understand what the future of my projects going to look like.
+Chapter 7: Step 6
+9:18
+9 minutes, 18 seconds
+So before I pick any technologies I want to think about this project's future. Is this going to be a weekend hobby project that I'm going to abandon in a few days?
+9:26
+9 minutes, 26 seconds
+Is it something that might need to scale to thousands of users?
+9:29
+9 minutes, 29 seconds
+I pretty much want to know are the decisions that I'm going to make today going to impact me in six months from now? Right now, this completely changes how I'm going to approach the project.
+9:38
+9 minutes, 38 seconds
+Because for a quick prototype, I might use a simple file based database and deploy to a free hosting service.
+9:44
+9 minutes, 44 seconds
+But for something that I expect that's going to grow the need to support users, I'll choose something that's more robust, something that may even require a little bit more work upfront.
+9:52
+9 minutes, 52 seconds
+So the worst mistake that you can make is overengineering a simple project or under engineering, something that actually does need to scale in the future.
+10:01
+10 minutes, 1 second
+So you really want to understand what is the future of this project as much as you can, so that you can make the right decisions and tradeoffs early on.
+10:08
+10 minutes, 8 seconds
+Now, this usually allows me to know how flexible I need to design my code and what I anticipate is going to come in the future. So again, just ask yourself, am I just doing this to get it done super quick?
+10:17
+10 minutes, 17 seconds
+Is it a hobby project? Is it a portfolio project?
+10:20
+10 minutes, 20 seconds
+Something I'm going to tune for a long time where our real user is actually going to be on this app, because that's going to impact the next decisions.
+10:26
+10 minutes, 26 seconds
+So now that I have a high level idea of what it is that I want to build, I want to drill into the specific components. So my building something that's a simple script that's going to run locally.
+Chapter 8: Step 7
+10:36
+10 minutes, 36 seconds
+Do I need a backend API and a frontend interface? Is this going to be a browser extension, a mobile app, a web service?
+10:42
+10 minutes, 42 seconds
+I want to know kind of how my app is going to live in what type of package. And start figuring out kind of that higher level architecture.
+10:49
+10 minutes, 49 seconds
+So this step is going to determine, well, the architecture of the project. And for something like a simple automation script. This might just be a Python file right there runs on some kind of schedule.
+10:58
+10 minutes, 58 seconds
+Whereas a social media app needs a backend, it needs a database, it needs a front end. It needs maybe all of these different components. Right.
+11:06
+11 minutes, 6 seconds
+And maybe a browser extension, for example, has completely different requirements.
+11:09
+11 minutes, 9 seconds
+So I want to get the packaging right and start figuring out those different high level components that I need. Now getting this wrong means rebuilding a lot of stuff later.
+11:17
+11 minutes, 17 seconds
+So I really spend a lot of time here thinking through how users are going to interact with my application and what technical components I'm actually going to require.
+11:25
+11 minutes, 25 seconds
+Now, it might sound obvious here, but you need to think through these core essential components. Okay, so that's step seven. Again at this point I'm figuring out do I need a back end front end.
+11:34
+11 minutes, 34 seconds
+Is this going to be an app. Is it going to be a website etc.. Once I know that I go on to pick my stack, which is step number eight. Okay.
+Chapter 9: Step 8
+11:42
+11 minutes, 42 seconds
+So for this step here, picking your stack, I just want to frame this. I like to pick my stack after I've done all of this planning.
+11:49
+11 minutes, 49 seconds
+Because really all of these things, these stacks, right. These tech stacks, they're simply just tools that help you create some kind of project.
+11:56
+11 minutes, 56 seconds
+So I like to come up with the project first and then say, okay, what tools can I use to solve this problem or to create this project, not the other way around, which is what a lot of beginners do.
+12:05
+12 minutes, 5 seconds
+They go, okay. I know Django for example.
+12:08
+12 minutes, 8 seconds
+I want to make a Django website, and then they start figuring out a project that fits within the Django website.
+12:13
+12 minutes, 13 seconds
+I mean, that's fine, especially if you're trying to learn Django, but if you're getting to more of a professional level, it should really be okay. This is the project.
+12:20
+12 minutes, 20 seconds
+Now let's go look at all of the tools that I know or that I could use, and pick the best one for this particular project, not the other way around where you're picking the tools first and then making the project fit the tools.
+12:31
+12 minutes, 31 seconds
+Right. You want to reverse that. Especially if you're building a larger, more professional project. So anyways, in this step, I choose my technologies, right?
+12:38
+12 minutes, 38 seconds
+And I have one general rule.
+12:40
+12 minutes, 40 seconds
+I pick the simplest stack that I can that fits within my relative skill set, and then I can actually accomplish my goals with. Now, I don't really have any ego about this.
+12:48
+12 minutes, 48 seconds
+I don't use a language because I like it better. I typically try to use whatever gets the job done the best.
+12:54
+12 minutes, 54 seconds
+So usually I need to pick something like a front end technology, a back end technology, maybe a database, and then usually specific frameworks for some different features that I need to build.
+13:04
+13 minutes, 4 seconds
+So for a simple web app, for example, I might have a react front end, a Node.js backend, maybe a MongoDB database. And then I have maybe a framework like laying chain or something.
+13:13
+13 minutes, 13 seconds
+If I'm going to implement maybe an AI agent or an AI component. Now, after I pick my stack, a key question that I ask is, can I actually deploy this?
+13:21
+13 minutes, 21 seconds
+Because there's no point in choosing technologies that I can't get into production.
+13:25
+13 minutes, 25 seconds
+So I always verify that I have a deployment path before I start coding, and that it's not going to take me longer to deploy my project than to code it out.
+13:33
+13 minutes, 33 seconds
+Now, many people overlook this, but you really want to make sure that you look into what the deployment steps are going to be, and if you're willing to follow along with those if you choose this particular stack.
+13:43
+13 minutes, 43 seconds
+I also like to stick with technologies that I know well, unless learning something is part of the project's goal, right? So I don't want to add unnecessary complexity by adding new frameworks or technologies.
+13:53
+13 minutes, 53 seconds
+If I don't know what I'm doing with it, if I've never used them before.
+13:57
+13 minutes, 57 seconds
+So even if rust is ten times more performant than Python, I'm probably going to go with Python because I know I can code a Python app ten times faster than I can code a rust one.
+14:07
+14 minutes, 7 seconds
+Okay, a lot of tough decisions in this stage. This is where most people get it wrong. But you want to consider all of the factors. And that's usually how I do it. Okay.
+14:14
+14 minutes, 14 seconds
+So now we move on to step number nine which is my overall development process.
+Chapter 10: Step 9
+14:19
+14 minutes, 19 seconds
+So once I know the stack, once I have the user stories, once I have the wireframe, once I have a really solid plan I start actually writing some code.
+14:26
+14 minutes, 26 seconds
+Now these are the steps that I follow pretty much every single time. And if you watch my YouTube videos, you're already going to be familiar with them. So first I create a project skeleton.
+14:35
+14 minutes, 35 seconds
+So basic folder structure development environments, version control. And this gives me a foundation to build on and doesn't overwhelm me when I'm starting out.
+14:44
+14 minutes, 44 seconds
+Next I start setting up my database and I create the data models that I plant. Okay. I always want to get the data layer working before I build anything that depends on it.
+14:52
+14 minutes, 52 seconds
+And because data is such an important part of any application, I do that first. Then I usually build my back end routes.
+14:59
+14 minutes, 59 seconds
+So the API endpoints, for example, that handle my different data operations and I test those pretty thoroughly before I move on to the front end.
+15:07
+15 minutes, 7 seconds
+Now obviously this is specific for kind of web development projects. For other projects it will vary. But I want to get the core functional out of the way without worrying about the UI and the design.
+15:17
+15 minutes, 17 seconds
+Then once I have that, I start working on my front end interface.
+15:20
+15 minutes, 20 seconds
+I connect that to my back end, and since my backend already works, I can just focus on the user experience and the UI rather than debugging multiple stages of my project at the same time.
+15:30
+15 minutes, 30 seconds
+Then of course we have project iteration. This is where I gradually add features.
+15:35
+15 minutes, 35 seconds
+I test as I go, and I deploy early and often, even if this application isn't 100% complete.
+15:41
+15 minutes, 41 seconds
+And then finally, if this is necessary for the project goals, I'll add automated deployments and testing can really depends on what I'm building.
+15:48
+15 minutes, 48 seconds
+And by this point, most of the bugs I've already caught in my project because I've been testing this throughout.
+15:53
+15 minutes, 53 seconds
+So I try to write small bits of code, test it, make sure it works, and then move on to the next stage rather than writing a behemoth of an application before I even run it one time.
+16:02
+16 minutes, 2 seconds
+Okay, so that's my complete project planning process. Nine steps that take me from an idea to an executable plan that I can actually work on.
+16:11
+16 minutes, 11 seconds
+Now, the key insight here is that planning isn't separate from development. It's really the foundation that makes development faster and more focused.
+16:19
+16 minutes, 19 seconds
+Most developers think planning is overhead. It's going to slow them down, but it's actually the complete opposite.
+16:24
+16 minutes, 24 seconds
+An hour of planning saves you days of coding, especially if you're going in the wrong direction and it's something you need to get good at. So start with your goal.
+16:32
+16 minutes, 32 seconds
+Understand your users, design your data ruthlessly. Scope your MVP. Pick simple technologies that you can actually deploy.
+16:40
+16 minutes, 40 seconds
+Follow this process and you will ship projects faster and with fewer headaches. This also doesn't need to take hours to do.
+16:46
+16 minutes, 46 seconds
+You can spin up a solid plan for basic apps in just a few minutes.
+16:50
+16 minutes, 50 seconds
+What's important is the process and really walking your mind through everything that you're going to need to get done. So you don't make really bad decisions early on anyways.
+16:59
+16 minutes, 59 seconds
+Guys, that's going to wrap up this video. I hope you enjoyed.
+17:02
+17 minutes, 2 seconds
+I'd love to hear your planning process in the comments down below, so let me know and I will see you in another YouTube video.
