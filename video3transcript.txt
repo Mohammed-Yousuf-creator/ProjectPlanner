@@ -1,1 +1,615 @@
 
+Chapter 1: Peak intro
+0:00
+0 seconds
+Programming is hard alone. You're expected to conjure a finished project that you have no idea how to build by writing some spells that you have to
+0:08
+8 seconds
+figure out yourself. And if you take any help, you're an impostor. But if you want to become a real developer at some point, you need to learn how to sit down
+0:16
+16 seconds
+with a blank page and actually figure this [ __ ] out. In this video, I'll show you how I go from an idea to a full sack app. The kind of challenges I face while
+0:24
+24 seconds
+building, which usually gets cut out from your tutorials, how I solve them, and my thinking patterns. I'll also share three strategies you can apply right now. I'll save you hundreds of
+0:32
+32 seconds
+hours of wasteful thinking. I'm very excited to do this because I have only been wipe coding these last 6 months.
+0:38
+38 seconds
+Will my company force me to? And the technologies I'll be using, I have not touched those in over 1.5 years. So, there's a very real chance I completely
+0:47
+47 seconds
+[ __ ] this up. But is that going to stop me from building my dream project? Which gamer color are you?
+0:52
+52 seconds
+No. No. [groaning] No. [crying] Uh, what is this project? I am so glad you asked. This is basically a
+Chapter 2: About the Project
+1:00
+1 minute
+personality test for gamers. You answer a bunch of questions and an algorithm deduces your gamer archetype like competitor, strategist, explorer,
+1:08
+1 minute, 8 seconds
+creator, socializer or collector. But before I log in, I want to see if this is even feasible right now. I have no
+1:15
+1 minute, 15 seconds
+idea how these personality algorithms even work. Do they use if statements, machine learning, neural networks,
+1:22
+1 minute, 22 seconds
+Indians? Lord actually told me that most modern tests use a weighted vector scoring system. Basically, each option
+1:29
+1 minute, 29 seconds
+contains scores or weights corresponding to each personality trait. You add these scores every time the user answers a question and the trait with the highest
+1:38
+1 minute, 38 seconds
+score becomes your archetype. Damn, this is much easier than I thought. But look, my project is actually inspired by radiocolor.com, which does the same
+1:47
+1 minute, 47 seconds
+thing but for book readers. And in the end, it gives you this beautiful graph that tells you exactly where your archetype lies. Now, that is insanely
+1:55
+1 minute, 55 seconds
+cool. I want this. Then, after some digging with Claude and my own brain, we actually found a very simple solution to this. Instead of each personality trait
+2:03
+2 minutes, 3 seconds
+having its own weight, we place the opposite personality traits on a spectrum. So, if you add plus 10 to mind, you're also deducting 10 points
+2:11
+2 minutes, 11 seconds
+from heart. In the end, treat the final score as coordinates and place it on a 2D graph. But I had one last obstacle.
+2:18
+2 minutes, 18 seconds
+This method works when you have two spectrums. But I have six archetypes which need three spectrums, not just you. So I came up with a solution that's
+2:26
+2 minutes, 26 seconds
+actually inspired by 100x hunter. First you place the three axis like this. So it forms a perfect hexagon. Now if plus 60 on one axis can be placed here, plus 20 on another axis can be placed here.
+2:37
+2 minutes, 37 seconds
+And minus 10 on the last axis can be placed here. Then the final location will become the average of these three coordinates. and we get this insanely
+2:46
+2 minutes, 46 seconds
+cool looking craft that leaves the users wondering how our algorithm works. Bro, now I am even more hyped to create this project. And with this, let me introduce
+Chapter 3: Quick Strategies
+2:54
+2 minutes, 54 seconds
+you to the fourth strategy of building something you have no idea how to blueprint. Instead of thinking if you should build something or not, research,
+3:02
+3 minutes, 2 seconds
+plan, and develop a complete architectural blueprint of that thing.
+3:06
+3 minutes, 6 seconds
+The next thing I'm going to do is finish the design of my core logic which we just discussed. Then I'm going to resource and pick some technologies I'll need. Then create the UIUX in Figma.
+3:15
+3 minutes, 15 seconds
+Design the system architecture which is just backend and database for this project. Write the good algorithm. And finally revise all the technologies required before even opening my VS code.
+3:24
+3 minutes, 24 seconds
+And you'll see preparing a blueprint not only makes development at least 10 times easier and much faster. But it introduces micro challenges that your
+3:33
+3 minutes, 33 seconds
+dopamine receptors come to. Let me also introduce you to the second strategy of this video that every professional developer secretly uses, division. Look,
+3:41
+3 minutes, 41 seconds
+what we just did was divide a massive project we had no idea how to build into smaller doable micro challenges.
+3:48
+3 minutes, 48 seconds
+Building which gamer color are you sounds overwhelming at first. But if you only look at these individual challenges, all of them are much much easier. So first let's create our
+Chapter 4: Architecting Project
+3:56
+3 minutes, 56 seconds
+project blueprint. For technologies, there are basically infinite options at this point. But HTML, CSS, JavaScript, and even ReactJS are very limited.
+4:04
+4 minutes, 4 seconds
+Links.js has a ton of features we will be needing like solar components and routing. So, I'll pick this. Why not other frameworks? Because I don't know
+4:12
+4 minutes, 12 seconds
+them. I'm also going to use Neon for the backend and database, which will make setting up O and Postgress a gazillion times easier, and also because they are
+4:20
+4 minutes, 20 seconds
+paying me money to use it. But it won't take anything away from this video. For that I'll get to show you how I learn a new technology by reading doc which is
+4:27
+4 minutes, 27 seconds
+an extremely extremely important skill for any developer. And now we have my favorite part. So this is the UI design I ended up designing and god I love this
+4:36
+4 minutes, 36 seconds
+UI. Tell me one AI agent that can come up with this. So this is going to be our landing page and basically the stickers in the background are going to move from
+4:45
+4 minutes, 45 seconds
+right to left. We're going to have an optional signin. This is how the quiz UIs are going to look like. And over here we have the final results. I also
+4:53
+4 minutes, 53 seconds
+changed the name of the archetypes to sound something much cooler. Next we have the system architecture. Now based on just the UI, can you think how many
+5:01
+5 minutes, 1 second
+back-end APIs we will need? Only three of them. First is when the user finishes the quiz and we need to calculate the archetype and the final result. The
+5:09
+5 minutes, 9 seconds
+second is when the user clicks on the copy link button and his friends click on that link. Then we'll need to fetch the results again from the back end. And the third endpoint is just for
+5:18
+5 minutes, 18 seconds
+authentication. Now I'll define these API endpoints more precisely. For the first endpoint, we will receive an array of quiz answers and return the archetype
+5:25
+5 minutes, 25 seconds
+x and y coordinate to place on the graph and the link slug for the copy link button. This will be the input format our endpoint will expect and this will
+5:33
+5 minutes, 33 seconds
+be the output our endpoint will uh vomit. Our API will call different functions for calculating the score archetype graph coordinate and finally
+5:41
+5 minutes, 41 seconds
+save the result in DB with links lug as the primary key. So this is how our database is going to look like. We only have two simple tables, results and
+5:50
+5 minutes, 50 seconds
+users. Now, at this point, I still wasn't sure how our code algorithm will technically work. So, in the next stage, I went ahead and wrote the code for our
+5:58
+5 minutes, 58 seconds
+core algorithm. This is exactly how I explained before. To calculate the final scores from the answers array, keep on adding the weight. To calculate the
+6:05
+6 minutes, 5 seconds
+archetype, we just check which archetype has the highest weight. Now, over here, I also included a secret seventh archetype, which is polymath. You unlock
+6:14
+6 minutes, 14 seconds
+this hidden archetype if you lie very close to the origin point because that would mean you really don't lie in any of the other six archetypes. And to
+6:22
+6 minutes, 22 seconds
+calculate the coordinates is just some basic trigonometry for revision. Now I can just ask AI to give me a quick personalized cheat sheet. And that is such a timesaver. I cannot elaborate.
+6:32
+6 minutes, 32 seconds
+And I also find out that Nex.js is now a completely different framework. So I had to watch a few videos for that. We haven't even opened our VS code yet and
+6:40
+6 minutes, 40 seconds
+our project is already halfway done. We will be cheesing our way through the coding stage. But before that, let me introduce you to the third strategy of building projects without taking stress.
+Chapter 5: Systems
+6:51
+6 minutes, 51 seconds
+Systems. Always work in systems and routines. This is the system I'm going to follow while building. If there's a massive goal, always first divide it
+6:58
+6 minutes, 58 seconds
+into micro challenges. And when solving a micro challenge and an obstacle appears, ask yourself if this is a memory problem like I don't remember the
+7:06
+7 minutes, 6 seconds
+syntax. If yes, then you can Google charg or use dogs. Don't feel bad at all on these type of problems. Memorization is not engineering. Ask if it is a
+7:15
+7 minutes, 15 seconds
+knowledge problem. I don't remember how flexbox or oath works. If yes, then learn the minimum knowledge needed for your current challenge again using
+7:22
+7 minutes, 22 seconds
+Google chargd or talks. Ask if it is a problem-solving challenge like what should be my caching strategy? How should I design this API? If yes, then
+7:30
+7 minutes, 30 seconds
+come up with approaches yourself first and only then seek help. Ask if it is a debugging problem like why is this error coming? If yes, then this could be any
+7:39
+7 minutes, 39 seconds
+of these three problems and you'll have to categorize it. This is how we divided our resource and planning phase. And this is how I will divide my development
+7:46
+7 minutes, 46 seconds
+phase. I'll start by writing the backend endpoints and the core logic. It is generally much easier to build the front end when you have the back end ready than to build the front end when you
+7:55
+7 minutes, 55 seconds
+don't have the back end ready. Next, I will set up my database and finish the rest of the back end. Then I'll set up O. Then I'll set up the dynamic page
+8:02
+8 minutes, 2 seconds
+links functionality. And then finally, I will build the front end. And one last thing, traditionally we used to use Google. Whenever we got stuck at a problem, search through GitHub and Stack
+8:11
+8 minutes, 11 seconds
+Overflow for hours at times and even ask a friend for help. I will be using Chargbd the same way in this video as a search engine, not a replacement for my
+8:19
+8 minutes, 19 seconds
+brain. Let's finally go npx create next app. Um, name can no longer contain capital letters. What? Okay, let's
+Chapter 6: Development Begins!
+8:28
+8 minutes, 28 seconds
+create our npx app finally. So, I'll use TypeScript ES linter no React compiler Tailwind CSS app router. As far as I
+8:36
+8 minutes, 36 seconds
+remember, React compiler used to be very OP in beta stage. So, I'll just quickly ask Charg about this. Yes, I generally enable React compiler. Yes. So, let's
+8:45
+8 minutes, 45 seconds
+customize these settings. I'm going to use TypeScript ESL. React compiler is a yes. So, I don't use Tailwind CSS. I
+8:53
+8 minutes, 53 seconds
+like to use bare vanilla CSS for more control, but I'm just going to say yes for now. Um, wait. NPM install has
+Chapter 7: First Error
+9:00
+9 minutes
+failed because allow scripts is not allowed in project scope installed.
+9:05
+9 minutes, 5 seconds
+That's why it is not able to run scripts like npm installed. So which kind of problem is this? This is a debugging problem. More specifically, I don't
+9:12
+9 minutes, 12 seconds
+think this is a memory problem. Like I don't remember the syntax. This is probably a knowledge problem because I have never faced this problem before.
+9:19
+9 minutes, 19 seconds
+And this probably not a problem-solving challenge. So I'm just going to charge GPD. This now the allow scripts parameter is set to ES build. Even charge GPD is not able to solve this.
+9:29
+9 minutes, 29 seconds
+But there's a quick work around to skip the installation entirely and then manually run npm install later. I'm pretty lazy. So, let's just do that.
+9:36
+9 minutes, 36 seconds
+Okay. But now it just chose no React compiler and the default options because it was unprovided. Oh man, I cannot believe this stage is taking so long.
+9:47
+9 minutes, 47 seconds
+Okay, awesome. It is finally done. Let's go inside our VS Code now. So, in the homepage, we already have a bunch of
+9:54
+9 minutes, 54 seconds
+code. Let's see how it looks like. Fate, it opened in my VS Code. Okay. Okay. I just noticed it doesn't have an SRC
+10:02
+10 minutes, 2 seconds
+folder. Oh my god. I'm going to just delete this repository again and rerun the setup. So I have to also use this src flag to have the src directory.
+10:11
+10 minutes, 11 seconds
+Okay. Oh my god, it is like 300 ms of data already. Ah, finally we have the src directory. So in XJS, if I want to
+10:19
+10 minutes, 19 seconds
+create a new URL endpoint, I only need to create a new folder inside the app directory. So if I make a folder called
+10:27
+10 minutes, 27 seconds
+API and then I create another folder which will be called where the [ __ ] is my Figma v1 create result. Okay. And
+10:35
+10 minutes, 35 seconds
+then I create another file called route.ts. And inside of that I write export async function.
+10:43
+10 minutes, 43 seconds
+Oh my god I have autocomplete on. So kodium was still on. Okay. And then I write a get request. Let's say if this
+10:51
+10 minutes, 51 seconds
+works then if I run this website npm rundev. What? Um what is it? npx rundev.
+11:01
+11 minutes, 1 second
+No it is npm rundev. Next is not recognizable. What? Oh my god. It just ran a few moments ago. Is the
+11:09
+11 minutes, 9 seconds
+installation broken again? Don't you hate it so much when the guy in the tutorial just runs it step by step and it works, but when you run it, it just gives random ass errors all the time.
+11:19
+11 minutes, 19 seconds
+Okay. So, which problem is it this time?
+11:21
+11 minutes, 21 seconds
+It is a debugging problem because why the hell is this error coming? It's not a memory problem where I don't remember the syntax. It is probably a knowledge
+11:29
+11 minutes, 29 seconds
+problem again and it's probably not a problem-solving challenge again. So, let me consult my AI. So, I told him this command was running before. Then I
+11:37
+11 minutes, 37 seconds
+deleted the folder and set up Nex.js once again with the src folder this time and now it's not running. What the [ __ ] Oh god, I forgot to do npm install.
+11:46
+11 minutes, 46 seconds
+[snorts]
+11:48
+11 minutes, 48 seconds
+Oh my god, dude. I'm going to crash out soon. I used the skip install flag again, but I forgot to do npm install
+11:56
+11 minutes, 56 seconds
+after the project got created. Okay, it is running now. So now we can finally start to create our [ __ ] project.
+Chapter 8: Backend Begins!
+12:02
+12 minutes, 2 seconds
+First of all, we have a post request over here. Okay, so I don't know the syntax of taking in the request body. So
+12:09
+12 minutes, 9 seconds
+let me get that first. Okay, so request is coming in like this. I'm just going to write this pretty quickly. Okay, we
+12:16
+12 minutes, 16 seconds
+got the response along with some error handling. And next we are going to be writing these functions for calculating the score vector archetype coordinates and finally saving the result to DBA.
+12:27
+12 minutes, 27 seconds
+And for the links L, we will be needing something like a UU ID. I'm going to ask GBD for that as well. This is a I don't
+12:34
+12 minutes, 34 seconds
+know the syntax problem. So it says the best approach is to use Nanoid. NPM install Nanoid and suddenly we have
+12:41
+12 minutes, 41 seconds
+thousand viruses in our laptop. No, just kidding.
+12:45
+12 minutes, 45 seconds
+or am I? And that's it. This is how we generate the link slug. This is what we will be sending back as a response.
+12:52
+12 minutes, 52 seconds
+Okay, now we are going to complete these three functions in the same folder. Let's create a new file called utils.
+12:58
+12 minutes, 58 seconds
+I'm just going to quickly yank the pseudo code we wrote in notion and yeah, too many errors. Let me just fix that.
+13:04
+13 minutes, 4 seconds
+So now I've defined all the three functions over here. Now I'll go and implement the rest of the end points.
+13:12
+13 minutes, 12 seconds
+All right. And with that, our fourth task is already done. We have written all the backend endpoints and the core logic. Now, on the next stage, I have to
+Chapter 9: DB + Backend
+13:19
+13 minutes, 19 seconds
+set up the database and complete the rest of the back end for which I'm going to use Neon. This is my first time, so I'm pretty excited actually, not just a
+13:27
+13 minutes, 27 seconds
+database. Neon is a complete backend platform with authentication, object storage, functions, and an gateway. Cool. Okay, so let's go on to the talks.
+13:35
+13 minutes, 35 seconds
+Okay, they already have a template for Nex.js, rebuilt prompt for connecting NexJS for application. Okay, they also have a video walkthrough, but let's just
+13:42
+13 minutes, 42 seconds
+read the documentation. It's usually much faster. Create a neon project.
+13:46
+13 minutes, 46 seconds
+Okay, I have to navigate to this link in the Neon console and create a new project. Create a NextJS project and add dependencies, which is just this
+13:54
+13 minutes, 54 seconds
+command. Then I have to store my credentials innv.logal file. These three are like very very common steps you will see in 90% of the documentations.
+14:03
+14 minutes, 3 seconds
+Configure the posgris client. There are multiple ways to make server side requests with Nex.js. We using the app router. So this line establishes a
+14:10
+14 minutes, 10 seconds
+connection to our neon database. Then we send the SQL query and we get the response and that's it. Yes, like that
+14:18
+14 minutes, 18 seconds
+is the level of simplicity and convenience I'm looking for especially with this project. We also have pages router and stuff but we are not using
+14:26
+14 minutes, 26 seconds
+them. Okay. So first I'll head to the projects page. Create project. We are going to use the posgress database and the neon o just going to yoink this.
+14:36
+14 minutes, 36 seconds
+Okay. I've created the project. I've installed the dependencies. I've stored the neon credentials. Now let's see if this code works. Okay, I'll create a
+14:44
+14 minutes, 44 seconds
+temporary file here. Wait, there are some errors. Argument of type string is not under. Okay, this will be a syntax problem. But luckily, I already know how
+14:52
+14 minutes, 52 seconds
+to fix this. But I don't know why it's throwing error over there. Is this a client component? Use client. No, the error is still coming. Okay, maybe it's
+15:00
+15 minutes
+because we have created this file under the API directory which by default has only the backend endpoints. So, I'll create a new temporary folder in the app
+15:09
+15 minutes, 9 seconds
+directory, which is only for the front end pages. Yes, it's working. I mean, it's not giving errors, but is the code actually running? Let's see. So, we'll go to /temp this time.
+15:20
+15 minutes, 20 seconds
+Yeah, first try. Man, that is genuinely so awesomely convenient. I I don't think I've ever set up a database on the first
+15:28
+15 minutes, 28 seconds
+try like that. I want to go back to the console and see monitor activity. H, okay, nothing much. Okay, I can go to
+15:36
+15 minutes, 36 seconds
+tables here and I can create a table in the console itself. There's also SQL editor. So I can directly run queries in
+15:44
+15 minutes, 44 seconds
+the console itself. There's also backup and restore databases. Okay, let's create our tables now. So create table.
+15:50
+15 minutes, 50 seconds
+Oh, this is like an ER diagram and the table was born. And now I want to push this data using our backend code only.
+15:57
+15 minutes, 57 seconds
+So first I have to import neon zap. Next I have to establish connection with our database. [ __ ] Now I have to write an
+16:05
+16 minutes, 5 seconds
+insert SQL query. So here is the query I wrote completely on my own. Trust me.
+16:10
+16 minutes, 10 seconds
+Okay, our Postgress query is completely ready. Now I'm very nervous to test this because if this post request fails, it
+16:18
+16 minutes, 18 seconds
+could be anything. It could be any of the core logic functions we wrote. It could be any line in our back end. It could be from Neon. It could be anything, bro.
+16:27
+16 minutes, 27 seconds
+Wait, why is it taking so long? [ __ ] This is a post request. I'll have to write a call command. Oh my god. Let's
+16:34
+16 minutes, 34 seconds
+go. Oh, he got it. Dude, first try. Man, it feels so great when you get all that gigantic code right on the first try.
+16:43
+16 minutes, 43 seconds
+Like, I'm really surprised this was even easier to set up than MongoDB. Okay, let's complete our second endpoint as well, which uses the links L to fetch the result from the database.
+Chapter 10: Weird Bug
+16:58
+16 minutes, 58 seconds
+URL rejected port number was not a decel number. Uh what port number was not a decimal number between 0 and 65534? Why?
+17:07
+17 minutes, 7 seconds
+How could that even be possible? So the URL is correct. Content type should be correct and the parameter is also correct. There is definitely some
+17:15
+17 minutes, 15 seconds
+Windows shenanigans. So let me ask my pet again. Things like these are so [ __ ] frustrating in Linux. Like you could copy and paste one command and it
+17:24
+17 minutes, 24 seconds
+will definitely run. For nextj route handlers, the standard approach is not to send JSON in a get body at all. it use parameters like these. Okay, let me
+17:33
+17 minutes, 33 seconds
+try that. Okay, finally it got fixed and it is working nice bro. And I just want to say I am so happy with Neon. Setting
+17:40
+17 minutes, 40 seconds
+up databases used to be such a huge headache in the past. Second task demolished. You know what else is demolished are four task. We already set
+17:50
+17 minutes, 50 seconds
+up the dynamic page link functionality with the link slugs. And for authentication, we actually need front end first. So I'll divide front end into
+Chapter 11: Frontend Begins!
+17:58
+17 minutes, 58 seconds
+four parts. the landing page, the quizzes page, the results page and the auth page. And I can divide it into further smaller parts. So like for the
+18:07
+18 minutes, 7 seconds
+front page, I'll first be adding this background which will be moving from right to left infinitely and continuously. Then I'll add this text,
+18:14
+18 minutes, 14 seconds
+then this text, then this text, then this button. And finally, I will import this as an SVG.
+Chapter 12: Another Obstacle
+18:29
+18 minutes, 29 seconds
+Uh how do I core this text? Now there's no CSS property to core the text and the only solution I can think of is to place
+18:37
+18 minutes, 37 seconds
+every single character separately at a specific place so it appears as one continuous curved text. This is actually
+18:44
+18 minutes, 44 seconds
+the first problem solving challenge we have faced so far because we did most of the homework already. I've come up with an approach already and I cannot really
+18:52
+18 minutes, 52 seconds
+think of anything else. So, where's my RGBD? First option is to use SVG. Oh my god, dude. I could just export this. I'm
+19:01
+19 minutes, 1 second
+so dumb, man. And why haven't I done this before? And you know, because Figma just renders everything so beautifully,
+19:09
+19 minutes, 9 seconds
+even like the shadows, the strokes, and everything much much better than HTML and CSS. I should be doing this for every component, man.
+Chapter 13: Integration Begins!
+19:25
+19 minutes, 25 seconds
+Yo guys, so I finished the entire front end basically. Um, you can see all the quizzes happening. There's a beautiful counter at the top and after answering
+19:34
+19 minutes, 34 seconds
+the last question, you are teleported to this beautiful, beautiful screen. I'm sorry to cut all that part. Most of it was just CSS. It would have been very
+19:42
+19 minutes, 42 seconds
+boring to watch, but the results are currently hardcoded right now. The next thing I need to do is connect the front end to the back end. So I have this answers array present on the front end.
+Chapter 14: Massive Bug
+19:52
+19 minutes, 52 seconds
+I just need to input this into our backend function. So I can get the actual archetype and coordinate values on the front end itself and complete
+19:59
+19 minutes, 59 seconds
+this cycle which is going to be pretty simple. Barely an inconvenience. Oh no.
+20:04
+20 minutes, 4 seconds
+Can't access property desk info is undefined. So this is coming from results.tsx.
+20:14
+20 minutes, 14 seconds
+Can't access desk and info is undefined.
+20:17
+20 minutes, 17 seconds
+So this is info. It is dependent on data which is coming from archetypes.json.
+20:23
+20 minutes, 23 seconds
+What? So if you have info as undefined that means you're getting an archetype which is not present in our archetypes.json.
+20:32
+20 minutes, 32 seconds
+Okay. I don't have polymath over here actually. Maybe that's the reason that or maybe we have capital letters somewhere. If we have capital letters it
+20:41
+20 minutes, 41 seconds
+must be coming from somewhere in the back end. From here it calculates the archetypes.
+20:48
+20 minutes, 48 seconds
+Here is the archetype map. Okay, we have capital casing. Let's fix that. Okay, let's test now. I hope I don't get
+20:56
+20 minutes, 56 seconds
+polymath this time. Yeah, we got it. You are a architect. Damn, that was pretty close to polymath. I would ideally have
+21:04
+21 minutes, 4 seconds
+this color as blue and this color as blue as well. And as a matter of fact, the reason I didn't add Polymath yet is
+21:10
+21 minutes, 10 seconds
+because guys, I am running so out of time to finish this video. Even my sponsors are waiting for me to submit
+21:19
+21 minutes, 19 seconds
+this video. But god damn, I'm so glad this is working, man. This API endpoint works. Um, okay. Now, to make this
+21:26
+21 minutes, 26 seconds
+endpoint work, it is actually very simple. The front end will just read this URL, send our slug to the back end API which sends us the archetype x
+21:34
+21 minutes, 34 seconds
+coordinate, y-coordinate and then um where did it go? We can just plug those variables into this results component.
+21:42
+21 minutes, 42 seconds
+So to create dynamic URLs inside Nex.js I just have to use this syntax and inside of this folder I can create my
+21:49
+21 minutes, 49 seconds
+page.tsx. So here I'm calling the component. We'll get the actual slug using this parameter over here along with some TypeScript shenanigans. And
+21:58
+21 minutes, 58 seconds
+wait, I already had the function to call the backend API in my clipboard. Wow, there we go. First try.
+Chapter 15: Another Massive Bug
+22:06
+22 minutes, 6 seconds
+Wait, error. W Mazaka. Now look guys, this is how a professional web developer debugs. So the page route is correct.
+22:17
+22 minutes, 17 seconds
+I'll pick another record from the console just so we know the bug is nothing external. Okay. [ __ ] Okay. Fail
+22:24
+22 minutes, 24 seconds
+to fetch the results. The error is very secretive. So let's trace this back to the back end. But we already tested the
+22:32
+22 minutes, 32 seconds
+back end. So we know it should be working. That means the problem must be in this function. I [snorts] mean it's a basic get request. Oh wait, we don't
+22:41
+22 minutes, 41 seconds
+have slug. The endpoint is not returning slug. So maybe that's the issue.
+22:47
+22 minutes, 47 seconds
+[ __ ]
+22:51
+22 minutes, 51 seconds
+No way.
+22:53
+22 minutes, 53 seconds
+No [ __ ] way, dude. Ah, the AI gave the wrong end point. [gasps] No, I don't know if I should be happy on
+23:01
+23 minutes, 1 second
+solving this bug or should I crash out on having wasted so much time on this front end completely demolished and we
+Chapter 16: Auth Begins!
+23:08
+23 minutes, 8 seconds
+have O as our final boss. Let's see if I can set this up without any errors. So, enable O in your Neon project. We have already done that. Install the Neon SDK.
+23:18
+23 minutes, 18 seconds
+Set up environment variables. Okay, rest of these steps are simply just creating new files and pasting this code over there. I'll quickly finish these steps.
+23:26
+23 minutes, 26 seconds
+And holy [ __ ] it's done. Now I can just sign in with Google. Literally, the only thing I did was copy those commands from
+23:33
+23 minutes, 33 seconds
+the documentation. And yeah, it's done now. My experience with Neon was genuinely so frictionless. Check it out
+23:40
+23 minutes, 40 seconds
+the links in the description. The free tour has more than anything you'll ever need for a personal project. Damn, that was not the final boss. And there you
+23:48
+23 minutes, 48 seconds
+go. With the help of division, blueprint and the system, we finished this project like it was nothing. Now the project looks so easy that I'm sure even you can build it by just watching this video.
+23:59
+23 minutes, 59 seconds
+Can you let me know in the comments?
+Chapter 17: Final Result
+24:01
+24 minutes, 1 second
+Man, I'm so glad the way this website turns out. I absolutely love the aesthetic, especially all these stickers in the backgrounds. They are so cute.
+24:10
+24 minutes, 10 seconds
+Let's find out my gamer color. No thanks. A loot chest appears in a game you have never played. I'll not Google it. I'll just open it. You just unlocked
+24:18
+24 minutes, 18 seconds
+a skill tree. Some points into whatever looks cool is right now. I literally just did that yesterday. You are stuck on a puzzle. Look up the solution.
+24:25
+24 minutes, 25 seconds
+Obviously, I'll just keep trying random combos until it clicks. Like a few weeks ago, it took me and my friends hours to solve a puzzle, but it felt so
+24:33
+24 minutes, 33 seconds
+satisfying that we actually managed to solve that. [music] It's paid in your game. Bonus currency lands. Gifted to a guild mate. Hell no. Save it for that item. You'll be obviously game night.
+24:43
+24 minutes, 43 seconds
+Looks like solo grinded or voice. Uh voice call. I prefer multiplayers way more. You have got one free evening in
+24:50
+24 minutes, 50 seconds
+your favorite game. [ __ ] yeah. Decorate, design, or build something or queue into ranked and climb. I'll probably do this. It's more chill. I don't grind anymore.
+24:58
+24 minutes, 58 seconds
+I just want to relax when I'm playing a video game. A friend asks you what you're proud of in game, someone you beat, something you made. Depends on the
+25:06
+25 minutes, 6 seconds
+game, but uh usually it's someone you beat. I show that off a lot. You know, fun fact, I've actually defeated a lot of top 500 Clash Royale players. A
+25:14
+25 minutes, 14 seconds
+friend invites you to a game you have never played. Look up a beginner's guide. Obviously, I'm just jumping in blind, dude. I don't even need to read the other options. I'd rather read a
+25:22
+25 minutes, 22 seconds
+guide than stumble into a surprise. Um, very rarely. I'd rather 100% my inventory alone than log on just to hang out with Oh, never. I get more
+25:31
+25 minutes, 31 seconds
+satisfaction from building something than from beating other players. [ __ ] no, dude. I'm a daredevil. [ __ ] yeah.
+25:40
+25 minutes, 40 seconds
+The actual joy is not knowing what's over the next ridge. Guides ruin it.
+25:43
+25 minutes, 43 seconds
+Spoilers ruin it. The unknown is the whole point. Yes, that sounds a lot like me. My opposite is the mastermind.
+25:49
+25 minutes, 49 seconds
+Someone who treat the wicki before setting foot outside the tutorial. [ __ ] yeah. Oh my god, dude. Breath of the Wild has been on my top since forever.
+25:57
+25 minutes, 57 seconds
+Elen Ring is my favorite game by far.
+26:00
+26 minutes
+And you guys know how much I love Minecraft as well. Damn, I'm so glad how accurate this actually turned out to be.
