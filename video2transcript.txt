@@ -1,1 +1,160 @@
 
+Chapter 1: Context
+0:00
+0 seconds
+The key difference between being a 1x developer and a 10x developer is just information. If you have the right information, you know the right steps to
+0:07
+7 seconds
+take, suddenly none of these things look hard. And I'm here to break that barrier. By the end of this video, I promise that your next project is going
+0:15
+15 seconds
+to be twice the fun, twice the knowledge, and half the time it took you to complete your last project. So, step one, understand the problem that you are
+Chapter 2: Step 1
+0:23
+23 seconds
+trying to solve. You and I we both have learned so many math examinations because we didn't read or understand the question completely. There are three
+0:31
+31 seconds
+things you need to note down before starting any project. Project requirements, resources and goals. So requirements of your project are the
+0:39
+39 seconds
+features and functionalities that has to be in your end result. In my dating app for example, I had the subscription model, detailed functionalities of each
+0:47
+47 seconds
+tab, functional requirements of chatting application, some miscellaneous good to have features etc. So you need to include all the technologies and
+0:54
+54 seconds
+concepts you would use. If you don't have any technologies that you don't know already, try to add at least a couple. Maybe not even project relevant
+1:01
+1 minute, 1 second
+but something like Neoim or ZSH or Docker. The next thing you want in your requirements is the maximum amount of time and effort you can realistically
+1:10
+1 minute, 10 seconds
+put in. So you can prepare a timeline or certain milestones to implement this.
+1:14
+1 minute, 14 seconds
+Trust me, all this decision-m will make all the difference. I'll explain later how. Resources include the places you will go to learn that new thing or where
+1:23
+1 minute, 23 seconds
+you'll go whenever you are stuck building something. Will it be Google, your notes, Discord, Charg, or a YouTube tutorial. Your goals are your outcomes, the final product and features you want.
+1:34
+1 minute, 34 seconds
+Maybe write down what you want to show in your resume before building it. Maybe the goal is to impress a friend or solve a painoint in someone's life or building
+1:41
+1 minute, 41 seconds
+a SAS application that gets at least 10 paid users. Requirements are more technical and outcomes are more business or self-oriented. The second type of
+1:49
+1 minute, 49 seconds
+goals are your journey based goals like maintaining your 14-day GitHub streak, learning to avoid distractions, becoming more confident in your coding skills, or
+1:57
+1 minute, 57 seconds
+gaining more exposure and experience to the unknown. Step two, probably the most fun part, plan out the whole project before even starting the development.
+Chapter 3: Step 2
+2:05
+2 minutes, 5 seconds
+Pick a simple tool like Notion, Excaliraw, Eraser.io, or Figma to document all decisions beforehand. It is very important that you don't skip these
+2:14
+2 minutes, 14 seconds
+steps so you don't waste your time and energy in making decisions in the middle of the development that are very cognitively heavy task. Decision-m breaks your flow state. The state of
+2:22
+2 minutes, 22 seconds
+mind when you're completely absorbed into one task rest of the world just disappears and your focus is pristine.
+2:29
+2 minutes, 29 seconds
+Isn't it really annoying when you're logged into a video game, a movie or cing and your mom comes and says it's dinner time? With decision-m minimize,
+2:38
+2 minutes, 38 seconds
+you instead focus completely on the hard skills. So make every single possible decision right now. In a fullsack app, this will look like formulating all the
+2:46
+2 minutes, 46 seconds
+possible backend API calls, drawing the database schema, documenting the core algorithm, figuring out how all your components of the app interact with each
+2:54
+2 minutes, 54 seconds
+other, maybe study about the topics you don't know already about, and then using all this knowledge to invent multiple different approaches to implement the
+3:02
+3 minutes, 2 seconds
+solution. In this trading game, for example, I shortlisted one algorithm that would compute the cost of a stock and built all the databases and APIs
+3:10
+3 minutes, 10 seconds
+around it. So pick the best one and follow it up by drawing a system architecture. Finally, prepare a rough UI sketch. As a Doom perfectionist, I go
+3:18
+3 minutes, 18 seconds
+all the way in. Don't be like me. In any other domain, the formula remains the same. Research, plan, select, and design solutions to reduce the amount of
+3:26
+3 minutes, 26 seconds
+decisions to be taken during the development phase. Step three. With all that planning, hopefully you are very excited to start this project. But as
+Chapter 4: Step 3
+3:35
+3 minutes, 35 seconds
+you develop the application, you will slowly lose the zeal and might end up giving on the project. This is the phase to mitigate this issue. Hear me out.
+3:44
+3 minutes, 44 seconds
+Firstly, I've repeated this several times before, but it is really, really important to break down your task into subtask and set hard deadlines on them.
+3:52
+3 minutes, 52 seconds
+This way, you will keep slurping on that dopamine hits every time you finish a subtask. And dopamine is a reinforcement
+4:00
+4 minutes
+algorithm. I love committing on gate at the end of every day because writing that single commit message literally registers the progress I made today into
+4:08
+4 minutes, 8 seconds
+my long-term memory. I don't even realize the amount of progress I've made until I think and recall about it. It's like a tradition of thanking yourself.
+4:16
+4 minutes, 16 seconds
+This boots serotonin, the algorithm that fuels internal motivation and gives you a good night's sleep. Secondly, you need to configure your resolve for
+4:26
+4 minutes, 26 seconds
+engineering this project. With a weak resolve, you'll keep on getting distracted. With a no matter what happens resolve, you will strengthen
+4:33
+4 minutes, 33 seconds
+your frontal loes. The module that makes logical thinking, reasoning, and creativity possible and weakens your existing impulsive programming. Step
+Chapter 5: Step 4
+4:42
+4 minutes, 42 seconds
+four, finally, finally, finally, you start the actual development. Now, this process is going to go so smoothly
+4:50
+4 minutes, 50 seconds
+because you have done all this homework before starting out the project. It's like entering the boss battle having done all the side quest before. you are
+4:57
+4 minutes, 57 seconds
+completely going to destroy it. Believe me. Now, if you're following a tutorial, you need to tread carefully because most tutorials directly tell you the
+5:05
+5 minutes, 5 seconds
+solution. They are like do this first, then do this, then do this, then do this, and your project will start working. The problem with these types of tutorials is that that's not how real
+5:14
+5 minutes, 14 seconds
+projects are built. A developers first try something and fails, then something else and fails, then something else, then fails, then something else, and
+5:22
+5 minutes, 22 seconds
+finally succeeds. In these type of tutorials, you completely skip the failure part where the actual learning happens. You don't learn anything from
+5:30
+5 minutes, 30 seconds
+success. Literally the right kind of tutorials tell you this is a component, this is a feature and this is how it
+5:37
+5 minutes, 37 seconds
+works. Now you build this mini project or solve this mini challenge and figure it out all by yourself. And after you have built it, here is the solution. If
+5:46
+5 minutes, 46 seconds
+you are building a project independently, then great. It's pretty much the same thing here. You deise your own many challenges like carefully thought out milestones that
+5:54
+5 minutes, 54 seconds
+are neither hard nor too easy to accomplish. Solve it and only if you get stuck after several attempts, then seek out solution online. If you're confused
+6:02
+6 minutes, 2 seconds
+how to find the right kind of resources, here is a quick cheat sheet. I've declined a lot of mediocre brands from partnering with me because I only partner with the highest quality brands.
+6:12
+6 minutes, 12 seconds
+They offer highly valuable content for free as well. So, I highly recommend you guys to check it out. And obviously if you're using an autocomplete then bro
+Chapter 6: Continue
+6:20
+6 minutes, 20 seconds
+you're not learning anything. The AI is the one who's learning. And this sounds common sense to me but you have to use AI as a teacher not Dorimon. Like if you
+6:29
+6 minutes, 29 seconds
+actually read and understand the solution step by step. It's by far the best learning tool. It's all about how you use this word. Almost every video I
+6:37
+6 minutes, 37 seconds
+made in this quarter have been request by the great manware community. Even this one. Let me know what video you would like me to create next. Check out
+6:44
+6 minutes, 44 seconds
+affiliates. Check out Discord. And thanks for watching, man.
