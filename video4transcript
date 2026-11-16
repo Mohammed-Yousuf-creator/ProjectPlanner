@@ -1,0 +1,263 @@
+Chapter 1: Peak intro
+0:00
+0 seconds
+Look at this rumé project of a fresher at SpaceX. A cloudnative AI coding harness orchestrating 100 plus concurrent agents in isolated cloud
+0:08
+8 seconds
+sandboxes. Like if you have this project on your resume, you officially don't need to build another project in your life. Like you have done it. You have
+0:17
+17 seconds
+solved coding. And I'm going to show you how crazy it is to build this thing than [music] it actually looks like. So, if you're planning to build a massive
+0:24
+24 seconds
+project from scratch or even with AI, man is there as always to smuggle some dark secret programming tricks and principles to lap your way into the big
+0:33
+33 seconds
+leagues. Professional developers use these all the time. By the way, this video is divided into six chapters, each focusing on one principle, then I'll
+0:40
+40 seconds
+demonstrate it by building the cloud AI hardness parallelly so you can understand both the theory and the practical implementation. This video is
+0:48
+48 seconds
+sponsored by Neon. Chapter one, build the absolute bare minimum required for your project. For this project, I'm literally only going to build the
+Chapter 2: Chapter 1: Bare Minimum Method
+0:56
+56 seconds
+harness, which is just an LLM call inside a for loop, and cloud, which is the Docker container. And that's it. The UI will just be a chat box. No chat
+1:04
+1 minute, 4 seconds
+history, user login, JWT or any other crap because that's not required to build a cloudnative AI harness. And even if we build it, we won't be able to show
+1:13
+1 minute, 13 seconds
+it off in our resume. The RO on the effort into adding chat history and user login is almost zero. And even our
+1:20
+1 minute, 20 seconds
+hardness and sandbox is going to be the bare minimum. Our hardness is just going to be an LLM API call inside a for loop where we keep appending last agents
+1:28
+1 minute, 28 seconds
+response into the next message. But we'll also need to provide it some tools for actually running any commands inside our docker container like creating a
+1:36
+1 minute, 36 seconds
+file or reading a file. Then every iteration I can execute all the tool calls requested by the LLM. And if it doesn't request any tool call, that
+1:45
+1 minute, 45 seconds
+means the agent is done with the task and we can exit the loop. And that's our entire agent hardness. Look, my goal is
+1:52
+1 minute, 52 seconds
+not to make you lazy programmers. You're already a lazy programmer if you're watching this video. My goal is to show that projects that look very big and
+2:00
+2 minutes
+hard can be simplified and implemented very easily if you just focus on the core functionality and not get overwhelmed by a 100 different
+2:07
+2 minutes, 7 seconds
+unnecessary features. I'll explain this in much more depth in the fourth chapter. Chapter two, build black boxes.
+Chapter 3: Chapter 2: Build Black Boxes
+2:13
+2 minutes, 13 seconds
+So after you've decided what the bare minimum looks like for your project, you'll probably open your VS Code, create a file in whichever folder you feel like right now, keep adding
+2:21
+2 minutes, 21 seconds
+hundreds of functions to the same file, and end up with a messy, deeply entangled codebase that makes you want to never touch coding ever again in your
+2:29
+2 minutes, 29 seconds
+life. Don't be ashamed. This is a hard challenge even for AI agents today. One hack that will immediately make your life exponentially easier is dividing
+2:37
+2 minutes, 37 seconds
+your code base into a few [music] big modules. Think of them like black boxes, like hardware components with USB adapters that any component can plug
+2:46
+2 minutes, 46 seconds
+into and send information to other component. The hardness can plug into the sandbox's interface, which is like its [music] USB port, to tell it to
+2:53
+2 minutes, 53 seconds
+create a file or read a file. The source layer can tell the sandbox to create a new container or destroy an existing one. Doing this means three things.
+3:01
+3 minutes, 1 second
+First, you'll always know exactly where to find the code, the bug, or the feature you're looking for and where you should write the new code. Secondly, you
+3:09
+3 minutes, 9 seconds
+can keep expanding one module independently without affecting rest of the system. For example, I can later swap sandbox from using Docker to a VM
+3:18
+3 minutes, 18 seconds
+or I can later add a functionality to switch between my custom harness, clot code or codec using their SDKs. And thirdly, it simplifies a complex project
+3:26
+3 minutes, 26 seconds
+in your head into simpler chunks. So, you're not randomly writing code base of wives and you can move really fast. In
+3:33
+3 minutes, 33 seconds
+layman terms, your codebase is more navigable, maintainable, scalable, and testable. In peasant terms, growing craw at random places is bad, and grouping
+3:42
+3 minutes, 42 seconds
+them together is good. We'll take a deeper look at this in the fifth chapter. Before that, we need to clear a prerequisite. Use external vendors. So,
+Chapter 4: Chapter 3: Use External Vendors
+3:50
+3 minutes, 50 seconds
+one of our community members recently tweeted this new hackathon project and the back end ate my entire day. Soro setup, database, endpoints, the
+3:58
+3 minutes, 58 seconds
+invisible work takes the longest. Well, there's a trick to do all of that within like 10 minutes. And I regret so much
+4:05
+4 minutes, 5 seconds
+not knowing about this earlier. You can essentially outsource a lot of laborous work to external windows and services.
+4:12
+4 minutes, 12 seconds
+You might have heard about component libraries like SH CN where you can steal all these UI components and even entire websites by just yoinking their code.
+4:20
+4 minutes, 20 seconds
+And you can do the exact same thing with backend components. Like with Neon, I get a manage Postgres database, authentication service, deployable
+4:28
+4 minutes, 28 seconds
+functions, object storage, AI gateway, and more in just a few lines of code. If you have ever set up a custom authentication in your app before, you
+4:37
+4 minutes, 37 seconds
+know how much of a hassle refreshing JWD tokens and setting up Google Oath is and it's still not entirely secure. With Neon O, I just need to add these two
+4:46
+4 minutes, 46 seconds
+[music] lines for my server and that's it. Neon handles everything else. It's their headache now. Now, for a cloud harness agent, I need a place to
+4:54
+4 minutes, 54 seconds
+permanently store all the files that the agent generates inside the sandbox. But I don't want to summon an entire AWS infra just for an S3 bucket. So instead,
+5:03
+5 minutes, 3 seconds
+I can just add this function to upload any file to Neon's bucket and this function to download it. The entire setup barely takes 5 minutes. Well, it
+5:11
+5 minutes, 11 seconds
+turns out our app also needs a pos database. So now I need to install Postgress SQL on my machine, configure database, create a user, configure
+5:18
+5 minutes, 18 seconds
+authentication, configure permissions, handle connection pooling, SSL, firewall rules, not to even mention deployment, scaling, and security issues. But here's
+5:26
+5 minutes, 26 seconds
+the thing, you don't need to adopt a side profession as a data engineer. Neon offers you 1 GB of hostet and manage postress database per project for
+5:35
+5 minutes, 35 seconds
+completely free. So now all I have to do is step one establish a connection with the server. Step two, run any SQL command I want. And that's it. If you
+5:43
+5 minutes, 43 seconds
+have ever rolled a custom authentication or database before, you know how much of a huge timesaver this is because as Rodrik Heley once said,
+5:51
+5 minutes, 51 seconds
+"Never do something when someone else can do it for you." Chapter four, build parallel data flows.
+Chapter 5: Chapter 4: Parallel Data Flows
+5:58
+5 minutes, 58 seconds
+I once built an app from scratch with about 80,000 lines of code in about 10 weeks near the end of my college. But if you ask me now, I can rebuild it in
+6:06
+6 minutes, 6 seconds
+under 20,000 lines of code in just a couple of weeks. Because earlier even though I'd built separate modules my dumbass kept entangling the underlying
+6:14
+6 minutes, 14 seconds
+logic into each other. What completely transformed my programming skills is when I learned that another dimension of clean code is depth. In the industry we
+6:23
+6 minutes, 23 seconds
+very commonly use the three lid architecture or back end. The controller is where you only define your API endpoints which acts like an interface like a USB port for your front end.
+6:32
+6 minutes, 32 seconds
+Similarly the data layer acts as an interface for database to read, create, update or delete any data. The business logic layer is where the actual backend
+6:41
+6 minutes, 41 seconds
+logic resides. It's the brain of your back end. So now when the user sends a message to a website, it first hits our send message endpoint in the controller
+6:50
+6 minutes, 50 seconds
+layer. Then the logic layer, the brain of her back end creates a docker container and kickstarts the agent loop.
+6:55
+6 minutes, 55 seconds
+Once it is done, it saves the data to Neon's postress and object storage, destroys the container, and finally sends back the response and the files
+7:03
+7 minutes, 3 seconds
+through the controller layer. This is what I call a data flow for a functionality which in this case is our core functionality when the user sends a
+7:11
+7 minutes, 11 seconds
+message. Now suppose if I want to create a button on the UI which downloads all the project files. For that I'll have to create a new endpoint, a new business
+7:18
+7 minutes, 18 seconds
+logic, a new data access method, maybe even a new table in parallel to my existing data flow. Similarly, for every method I need for account and chat
+7:27
+7 minutes, 27 seconds
+history management, I'll need to create numerous data flows in parallel to each other. So what all this means is fun.
+7:34
+7 minutes, 34 seconds
+When you think of functionalities as deep distinct parallel data flows, you greatly reduce the risk of entangling your codebase. This is how you must try
+7:42
+7 minutes, 42 seconds
+to design your projects. And to your core functionality, the goal of your project should ideally get done within one to three data flows. If you follow
+7:50
+7 minutes, 50 seconds
+this coding paradigm from the starting of your project, you will breeze through coding and save countless hours of unnecessary stress. Speaking from
+7:58
+7 minutes, 58 seconds
+experience, also I recently discovered that this design pattern is actually formerly known as vertical slices, but them. I'll call this data flows.
+Chapter 6: Chapter 5: Build Deep Modules
+8:07
+8 minutes, 7 seconds
+Chapter five, build deep modules. All right, enough theory. Let's go straight into our cloud hardness app this time.
+8:13
+8 minutes, 13 seconds
+First, we'll need a folder each for controller, brain, hardness, sandbox, and DB alongside an entry point for our app. In controller and brain, let's add
+8:21
+8 minutes, 21 seconds
+one file each. Inside harness, we'll probably need an agent loop, an LLM client for actually making third party LLM calls, tools. py for defining the
+8:30
+8 minutes, 30 seconds
+tools we'll give to our agent, and execute tools. py for sending tool execution calls to our sandbox. Inside sandbox, we'll need a file for setting
+8:38
+8 minutes, 38 seconds
+up the sandbox and another for executing commands. In DB, we'll have one file for our storage bucket and one for project table operations inside Neon. Finally, we'll create interfaces for each module.
+8:50
+8 minutes, 50 seconds
+This file exposes some functions that other modules can access. And the underscore is a convention that tells us to not import this from the outside. So
+8:59
+8 minutes, 59 seconds
+we hide the giant implementation behind a thin tiny interface. And now you're only left with mini games of writing code in each file one by one. Amazing.
+Chapter 7: Chapter 6: Use AI
+9:09
+9 minutes, 9 seconds
+Chapter six. Use AI but not for wipe coding for researching and even writing code logic when you are completely stuck. Not knowing what to code is
+9:18
+9 minutes, 18 seconds
+normal and it does not mean that you're bad at coding. What is bad is looking up the solution without even giving your best shot at it. And in fact, even if
+9:26
+9 minutes, 26 seconds
+you figure out exactly what code to write, I still highly recommend asking Chart GBD to review and suggest changes.
+9:33
+9 minutes, 33 seconds
+Most developers stop writing code once their app starts to work. But the additional feedback by someone better than you is what gets you ahead most
+9:40
+9 minutes, 40 seconds
+developers. I've actually built an entire AI skills toolkit for this exact purpose. And because you guys love it so much, I'm currently working on a much larger V2, so keep an eye once it's out.
+Chapter 8: Secret
+9:51
+9 minutes, 51 seconds
+Secret chapter 7, make a DLC expansion pack. Okay, now that you have completed your base app with the bare minimum functionalities, you should really
+10:00
+10 minutes
+consider adding a little more features just for personal learning. As I explained in chapter 3, setting up authentication, database, and risk of
+10:08
+10 minutes, 8 seconds
+the back end is very trivial using a service like Neon. and stuff like adding chat history is just four basic CRUD operations for each backend layer. I
+10:17
+10 minutes, 17 seconds
+told you adopting this coding paradigm is going to make coding exponentially easier as you go. I can upgrade my hardness by adding memories, context
+10:25
+10 minutes, 25 seconds
+engineering skills and GitHub integration completely separate from rest of the app. And most of these features are going to be very easy to
+10:32
+10 minutes, 32 seconds
+implement because our foundations are strong. And if I'm being honest, I really love building something just because I want to build it and I'm
+10:41
+10 minutes, 41 seconds
+choosing to build it instead of building just because I need it for a good resume or a job. And I can just leave the project at any point I feel like I'm
+10:49
+10 minutes, 49 seconds
+done playing with it. By the way, in case you didn't realize yet, you just got a lesson on coding design patterns, laring as a how to build complex
+10:57
+10 minutes, 57 seconds
+projects very easily video. If you got LA and want to laugh more, become a lapware by subscribing now. To summarize this video quickly, start with the
+11:05
+11 minutes, 5 seconds
+absolute perennium requirements for the project. Divide your app into modules based on functionalities. Use external windows like neon to get your done
+11:14
+11 minutes, 14 seconds
+quickly. Design each functionality as a single deep data flow. Hide big implementations of each module behind a thin interface. Use AI for research when
+11:23
+11 minutes, 23 seconds
+you get stuck and for feedback. Keep upgrading your app once you are done with the core functionality. Subscribe to manware and thanks for watching.
