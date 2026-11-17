@@ -25,6 +25,14 @@ const paths: Record<string, string> = {
   skip: 'M5 5l8 7-8 7zM17 5v14',
   undo: 'M9 14L4 9l5-5M4 9h10a6 6 0 010 12h-3',
   external: 'M14 4h6v6M20 4l-9 9M18 14v6H4V6h6',
+  search: 'M11 18a7 7 0 100-14 7 7 0 000 14zM20 20l-4-4',
+  bell: 'M6 16V11a6 6 0 0112 0v5l2 2H4l2-2zM10 21h4',
+  gear: 'M12 15a3 3 0 100-6 3 3 0 000 6zM19 12a7 7 0 00-.1-1.3l2-1.5-2-3.4-2.3 1a7 7 0 00-2.2-1.3L14 3h-4l-.4 2.5a7 7 0 00-2.2 1.3l-2.3-1-2 3.4 2 1.5a7 7 0 000 2.6l-2 1.5 2 3.4 2.3-1a7 7 0 002.2 1.3L10 21h4l.4-2.5a7 7 0 002.2-1.3l2.3 1 2-3.4-2-1.5c.1-.4.1-.9.1-1.3z',
+  calendar: 'M5 6h14v14H5zM5 10h14M9 3v4M15 3v4',
+  up: 'M12 19V5M6 11l6-6 6 6',
+  down: 'M12 5v14M6 13l6 6 6-6',
+  scissors: 'M6 9a3 3 0 100-6 3 3 0 000 6zM6 21a3 3 0 100-6 3 3 0 000 6zM20 4L8.1 15.9M14.5 14.5L20 20M8.1 8.1L12 12',
+  mic: 'M12 15a3 3 0 003-3V6a3 3 0 00-6 0v6a3 3 0 003 3zM5 11a7 7 0 0014 0M12 18v3',
 };
 
 export function Icon({ name, size = 16 }: { name: keyof typeof paths | string; size?: number }) {

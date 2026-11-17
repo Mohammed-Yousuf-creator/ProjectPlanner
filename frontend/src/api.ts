@@ -1,6 +1,9 @@
 // Thin client for the Go API. Every call goes to the same origin under /api.
 
-import type { Bundle, GitInfo, Meta, Project, ProjectSummary, StoredFile } from './types';
+import type {
+  Activity, Alert, AppSettings, BackupInfo, BackupList, Bundle, GitInfo, Lesson, Meta, Obstacle, Project, ProjectSummary,
+  SearchHit, SnapshotView, StoredFile,
+} from './types';
 
 export class ApiError extends Error {
   status: number;
@@ -83,6 +86,38 @@ export const api = {
   },
   fileUrl: (id: number, download = false) => `/api/files/${id}/content${download ? '?download=1' : ''}`,
   exportUrl: (id: number) => `/api/projects/${id}/export.md`,
+  archiveUrl: (id: number) => `/api/projects/${id}/export.zip`,
+  calendarUrl: (id: number) => `/api/projects/${id}/calendar.ics`,
+
+  // Keeping scope and time honest.
+  snapshot: (id: number) => request<SnapshotView>('GET', `/projects/${id}/snapshot`),
+  ackBuild: (id: number) => request<void>('POST', `/projects/${id}/ack-build`, {}),
+  setPicks: (id: number, day: string, taskIds: number[]) => request<void>('PUT', `/projects/${id}/picks/${day}`, { task_ids: taskIds }),
+  setCutOrder: (id: number, storyIds: number[]) => request<void>('PUT', `/projects/${id}/cut-order`, { story_ids: storyIds }),
+  cut: (id: number, body: { story_id?: number; task_id?: number; milestone_id?: number }) => request<void>('POST', `/projects/${id}/cut`, body),
+  stuck: (obstacleId: number, action: 'retry' | 'help', approach = '') =>
+    request<Obstacle>('POST', `/obstacles/${obstacleId}/stuck`, { action, approach }),
+
+  // Across projects.
+  settings: () => request<AppSettings>('GET', '/settings'),
+  saveSettings: (body: Partial<AppSettings>) => request<AppSettings>('PUT', '/settings', body),
+  lessons: () => request<Lesson[]>('GET', '/lessons'),
+  search: (q: string) => request<SearchHit[]>('GET', `/search?q=${encodeURIComponent(q)}`),
+  activity: () => request<Activity>('GET', '/activity'),
+  alerts: () => request<Alert[]>('GET', '/alerts'),
+  backups: () => request<BackupList>('GET', '/backups'),
+  createBackup: () => request<BackupInfo>('POST', '/backups', {}),
+  restoreBackup: (name: string) => request<{ safety_backup: string }>('POST', `/backups/${encodeURIComponent(name)}/restore`, {}),
+  deleteBackup: (name: string) => request<void>('DELETE', `/backups/${encodeURIComponent(name)}`),
+  async importProject(file: Blob): Promise<Project> {
+    let res: Response;
+    try {
+      res = await fetch('/api/import', { method: 'POST', headers: { 'Content-Type': 'application/zip' }, body: file });
+    } catch {
+      throw new ApiError(0, 'The import failed. Is the backend running?');
+    }
+    return parse<Project>(res);
+  },
 };
 
 export type Resource = 'stories' | 'items' | 'milestones' | 'tasks' | 'obstacles';

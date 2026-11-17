@@ -1,4 +1,6 @@
-import { Navigate } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
+import { BreaksCard, PitchRehearsal } from '../components/HackExtras';
+import { cutOrder } from '../lib';
 import { HackTimeline, HeroClock, useClock } from '../components/Clock';
 import { AddInput, Badge, Card, Field, Icon, Progress, SavedDate, SavedText } from '../components/ui';
 import { api } from '../api';
@@ -95,6 +97,8 @@ export default function Hackathon() {
             </details>
           </Card>
 
+          <BreaksCard now={now} />
+
           <Card title="Judging criteria" aside={<span className="muted">{criteria.length || 'none yet'}</span>}>
             <p className="lead">Copy these from the rules. Every feature you build should move one of them — if it moves none, it does not belong in the MVP.</p>
             <ul className="plain-list">
@@ -136,10 +140,21 @@ export default function Hackathon() {
             <PlanField k="pitch" label="One-sentence pitch" minRows={1} placeholder="For <who>, this <does what>, so that <why it matters>." />
             <PlanField k="demo_script" label="Demo script" minRows={4}
               placeholder={'1. The problem, in one sentence\n2. Show the core feature working — the happy path only\n3. The one clever thing\n4. What comes next'} />
-            <PlanField k="cut_order" label="If time runs short, cut in this order" minRows={2}
-              hint="Decide now, while you are calm. At hour 20 you will not want to choose."
-              placeholder={'1. …\n2. …'} />
+            <div className="field">
+              <span className="field-label">If time runs short, cut in this order</span>
+              {cutOrder(b.stories).length === 0 ? (
+                <p className="field-hint">No MVP stories yet. <Link to="../blueprint/mvp" relative="path">Pick them</Link>, then rank them.</p>
+              ) : (
+                <>
+                  <ol className="cut-order-brief">{cutOrder(b.stories).slice(0, 4).map((s) => <li key={s.id}>{s.text}</li>)}</ol>
+                  <p className="field-hint">Decide now, while you are calm. At hour 20 you will not want to choose. <Link to="../blueprint/mvp" relative="path">Change the order</Link></p>
+                </>
+              )}
+            </div>
+            {p.plan.cut_order?.trim() && <PlanField k="cut_order" label="Notes on cutting" minRows={2} />}
           </Card>
+
+          <PitchRehearsal />
         </div>
       </div>
     </div>

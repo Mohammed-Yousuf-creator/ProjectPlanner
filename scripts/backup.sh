@@ -22,6 +22,7 @@ trap 'rm -rf "$work"' EXIT
 pg_dump --no-owner --no-privileges "$url" > "$work/planner.sql"
 if [ -d "$data_dir/uploads" ]; then cp -r "$data_dir/uploads" "$work/uploads"; else mkdir "$work/uploads"; fi
 
-mkdir -p backups
-tar -czf "backups/planner-$stamp.tar.gz" -C "$work" planner.sql uploads
-ok "Backup written to backups/planner-$stamp.tar.gz ($(du -h "backups/planner-$stamp.tar.gz" | cut -f1))"
+out_dir="$(dotenv PLANNER_BACKUP_DIR backups)"
+mkdir -p "$out_dir"
+tar -czf "$out_dir/planner-$stamp.tar.gz" -C "$work" planner.sql uploads
+ok "Backup written to $out_dir/planner-$stamp.tar.gz ($(du -h "$out_dir/planner-$stamp.tar.gz" | cut -f1))"

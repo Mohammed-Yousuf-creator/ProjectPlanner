@@ -1,19 +1,24 @@
 // Steps 1–4: what am I building, and what is the smallest version of it?
 
 import { api } from '../api';
+import { useShipDateMove } from '../components/Honesty';
 import { AddInput, Badge, Empty, Field, Icon, SavedDate, SavedText, Segmented } from '../components/ui';
+import { cutOrder } from '../lib';
 import { useProject } from '../store';
-import type { CriterionData, QuestionData, ResourceData, Story, Tier } from '../types';
+import type { CriterionData, NotDoingData, QuestionData, ResourceData, Story, Tier } from '../types';
+import { fmtDate, fmtDateTime, roughly, useNow } from '../time';
 import { ItemCard, PlanField } from './common';
 
 // ---------- 1. goal ----------
 
 export function GoalStep() {
-  const { p, run, items, addItem, updateItem, removeItem } = useProject();
+  const { p, items, addItem, updateItem, removeItem } = useProject();
   const hack = p.type === 'hackathon';
   const criteria = items<CriterionData>('criterion');
+  const ship = useShipDateMove();
   return (
     <>
+      {ship.modal}
       <PlanField k="why" label="Why am I building this?"
         hint={hack ? 'What are you making, and why would it win or be worth the weekend?' : 'A hobby project, a portfolio piece, a startup idea, a client job, a way to learn something? Be exact — the same developer builds very differently for each.'}
         placeholder="I am building this because…" />
@@ -49,8 +54,11 @@ export function GoalStep() {
         <div className="form-row">
           <PlanField k="time_budget" label="Time and effort I can realistically put in"
             placeholder="e.g. 8 hours a week, evenings and Sunday" minRows={1} />
-          <Field label="Target date for the MVP" hint="Optional. Generated milestones are spread up to this date." htmlFor="target-date">
-            <SavedDate id="target-date" value={p.target_date ?? ''} onSave={(v) => run(() => api.patchProject(p.id, { target_date: v }))} />
+          <Field label="Target date for the MVP" htmlFor="target-date"
+            hint={p.phase === 'plan' ? 'Optional. Generated milestones are spread up to this date.'
+              : p.original_target_date && p.original_target_date !== p.target_date ? `First planned for ${fmtDate(p.original_target_date + 'T12:00')}. Moving it again needs a reason.`
+                : 'Coding has started: moving this date needs a reason, and every move is counted.'}>
+            <SavedDate key={`${p.target_date}-${ship.pending === null}`} id="target-date" value={p.target_date ?? ''} onSave={ship.change} />
           </Field>
         </div>
       )}
@@ -68,7 +76,9 @@ export function ResearchStep() {
   const { items, addItem, updateItem, removeItem } = useProject();
   const questions = items<QuestionData>('question');
   const resources = items<ResourceData>('resource');
-  const open = questions.filter((q) => q.data.status !== 'answered').length;
+  const open = questions.filter((q) => (q.data.status ?? 'open') === 'open').length;
+  const learn = questions.filter((q) => q.data.status === 'learn').length;
+  const now = useNow(30_000);
   return (
     <>
       <PlanField k="feasibility_notes" label="Is this even doable?"
@@ -85,12 +95,22 @@ export function ResearchStep() {
               placeholder="Approaches I considered, and the one I picked…" ariaLabel="Answer" />
             <div className="item-card-foot">
               <Segmented size="sm" ariaLabel="Status" value={q.data.status ?? 'open'} onChange={(v) => updateItem(q, { status: v })}
-                options={[{ value: 'open', label: 'Open' }, { value: 'answered', label: 'Decided' }]} />
+                options={[
+                  { value: 'open', label: 'Open' },
+                  { value: 'answered', label: 'Decided' },
+                  { value: 'learn', label: 'Learn while building', title: 'Stop researching: it becomes a task on the board' },
+                ]} />
+              <QuestionBox status={q.data.status ?? 'open'} until={q.data.box_until} now={now} />
             </div>
           </ItemCard>
         ))}
         <AddInput placeholder="e.g. How do I store uploaded files?" onAdd={(text) => addItem('question', { text, status: 'open', answer: '' })} />
-        {questions.length > 0 && <p className="muted small">{open === 0 ? 'Everything is decided.' : `${open} still open.`}</p>}
+        {questions.length > 0 && (
+          <p className="muted small">
+            {open === 0 ? 'Nothing left open.' : `${open} still open.`}
+            {learn > 0 && ` ${learn} to learn while building — each becomes a task on the board when coding starts.`}
+          </p>
+        )}
       </Field>
 
       <Field label="Where I go when I'm stuck" hint="Docs, a book, a forum, a friend, your own notes. Decide now so you do not wander later.">
@@ -110,6 +130,14 @@ export function ResearchStep() {
       </Field>
     </>
   );
+}
+
+/** The time-box of an open question: research has an end, like everything else here. */
+function QuestionBox({ status, until, now }: { status: string; until?: string; now: number }) {
+  if (status !== 'open' || !until) return null;
+  const left = new Date(until).getTime() - now;
+  if (left > 0) return <span className="box-note" title={fmtDateTime(until)}><Icon name="clock" size={12} /> decide within {roughly(left)}</span>;
+  return <span className="box-note over"><Icon name="alert" size={12} /> time-box over {roughly(-left)} ago — decide, or learn it while building</span>;
 }
 
 // ---------- 3. user stories ----------
@@ -162,14 +190,17 @@ const TIERS: { key: Tier; title: string; blurb: string }[] = [
 ];
 
 export function MvpStep() {
-  const { b, run } = useProject();
+  const { b, p, run, items, addItem, updateItem, removeItem } = useProject();
   const by = (tier: Tier) => b.stories.filter((s) => s.tier === tier);
   const unsorted = by('unsorted');
   const total = b.stories.length;
   const mvp = by('mvp').length;
   const share = total ? Math.round((mvp / total) * 100) : 0;
-  const tooBig = total > 0 && mvp * 2 > total;
+  const budget = b.limits.scope_budget;
+  const full = mvp >= budget;
+  const tooBig = total > 0 && (mvp > budget || mvp * 2 > total);
   const move = (s: Story, tier: Tier) => run(() => api.patch('stories', s.id, { tier }));
+  const notDoing = items<NotDoingData>('notdoing');
 
   if (total === 0) {
     return <Empty title="Nothing to cut yet">Write your user stories first (previous step), then come back and be ruthless.</Empty>;
@@ -180,7 +211,12 @@ export function MvpStep() {
       <div className={`cut-meter ${tooBig ? 'too-big' : ''}`}>
         <div className="cut-meter-head">
           <strong>{mvp} of {total} stories in the MVP ({share}%)</strong>
-          <span>{tooBig ? 'Still too big — aim to cut about half.' : mvp === 0 ? 'Pick what the app cannot function without.' : 'Small enough to finish.'}</span>
+          <span>{mvp > budget ? `Over the budget of ${budget}. Move ${mvp - budget} out.` : tooBig ? 'Still too big — aim to cut about half.' : mvp === 0 ? 'Pick what the app cannot function without.' : 'Small enough to finish.'}</span>
+        </div>
+        <div className="budget" role="img" aria-label={`${mvp} of ${budget} MVP slots used`}>
+          {Array.from({ length: Math.max(budget, mvp) }, (_, i) => <i key={i} className={i < mvp ? (i < budget ? 'used' : 'over') : ''} />)}
+          <span>Scope budget: <strong>{budget}</strong> MVP {budget === 1 ? 'story' : 'stories'} for a {p.type === 'hackathon' ? 'hackathon' : `${p.complexity} project`}.
+            {full ? ' Full — to add one, move one out.' : ` ${budget - mvp} left.`}</span>
         </div>
         <div className="cut-meter-bar" aria-hidden="true">
           <div style={{ width: `${share}%` }} />
@@ -196,7 +232,7 @@ export function MvpStep() {
               <li key={s.id} className="row">
                 <span className="row-main">{s.text}</span>
                 <div className="tier-buttons">
-                  <button className="btn btn-sm btn-primary" onClick={() => move(s, 'mvp')}>Yes — MVP</button>
+                  <button className="btn btn-sm btn-primary" disabled={full} title={full ? `The MVP is full (${budget}). Move a story out first.` : undefined} onClick={() => move(s, 'mvp')}>Yes — MVP</button>
                   <button className="btn btn-sm" onClick={() => move(s, 'later')}>Later</button>
                   <button className="btn btn-sm" onClick={() => move(s, 'cut')}>Cut</button>
                 </div>
@@ -219,7 +255,8 @@ export function MvpStep() {
                   <span>{s.text}</span>
                   <div className="tier-moves">
                     {TIERS.filter((x) => x.key !== t.key).map((x) => (
-                      <button key={x.key} className="link-btn" onClick={() => move(s, x.key)}>→ {x.title}</button>
+                      <button key={x.key} className="link-btn" disabled={x.key === 'mvp' && full}
+                        title={x.key === 'mvp' && full ? `The MVP is full (${budget}). Move a story out first.` : undefined} onClick={() => move(s, x.key)}>→ {x.title}</button>
                     ))}
                   </div>
                 </li>
@@ -230,9 +267,60 @@ export function MvpStep() {
         ))}
       </div>
 
+      <CutOrder />
+
+      <Field label="Not doing"
+        hint="Things this project deliberately leaves out, and why. Written down now, they stop coming back as “quick additions” in week three.">
+        <ul className="plain-list">
+          {notDoing.map((n) => (
+            <li key={n.id} className="row row-wrap">
+              <SavedText className="row-main" value={n.data.text ?? ''} onSave={(v) => updateItem(n, { text: v })} ariaLabel="Not doing" />
+              <SavedText className="row-main" value={n.data.why ?? ''} onSave={(v) => updateItem(n, { why: v })} placeholder="because…" ariaLabel="Why not" />
+              <button className="icon-btn" aria-label="Remove" onClick={() => removeItem(n.id)}><Icon name="trash" size={15} /></button>
+            </li>
+          ))}
+        </ul>
+        <AddInput placeholder="e.g. User accounts — one local user is enough" onAdd={(text) => addItem('notdoing', { text, why: '' })} />
+      </Field>
+
       <PlanField k="mvp_statement" label="The MVP in one sentence"
         hint="The absolute minimum that still gives someone value. If it needs an “and also”, it is not minimal yet."
         placeholder="A user can … and that is it." minRows={1} />
     </>
+  );
+}
+
+/**
+ * The order in which MVP stories get cut when a milestone slips. Decided now, with a clear head,
+ * so that the decision under deadline pressure is already made.
+ */
+function CutOrder() {
+  const { b, p, run } = useProject();
+  const order = cutOrder(b.stories);
+  if (order.length < 2) return null;
+  const ranked = order.some((s) => s.cut_rank !== null);
+  const save = (list: Story[]) => run(() => api.setCutOrder(p.id, list.map((s) => s.id)));
+  const swap = (i: number, j: number) => {
+    const next = order.slice();
+    [next[i], next[j]] = [next[j], next[i]];
+    void save(next);
+  };
+  return (
+    <Field label="If time runs short, cut in this order"
+      hint="The first one goes first. When a milestone slips, the planner offers exactly this cut — one click, no debate.">
+      <ol className="cut-order">
+        {order.map((s, i) => (
+          <li key={s.id}>
+            <span className="cut-rank">{i + 1}</span>
+            <span className="row-main">{s.text}</span>
+            {i === 0 && <Badge tone="danger">first to go</Badge>}
+            {i === order.length - 1 && <Badge tone="ok">last to go</Badge>}
+            <button className="icon-btn" aria-label="Cut earlier" title="Cut earlier" disabled={i === 0} onClick={() => swap(i, i - 1)}><Icon name="up" size={14} /></button>
+            <button className="icon-btn" aria-label="Cut later" title="Cut later" disabled={i === order.length - 1} onClick={() => swap(i, i + 1)}><Icon name="down" size={14} /></button>
+          </li>
+        ))}
+      </ol>
+      {!ranked && <p className="muted small">Not ranked yet: this is the default (last story first). <button className="link-btn" onClick={() => save(order)}>Keep this order</button></p>}
+    </Field>
   );
 }

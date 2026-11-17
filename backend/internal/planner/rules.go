@@ -4,7 +4,9 @@
 package planner
 
 import (
+	"encoding/json"
 	"fmt"
+	"sort"
 	"time"
 
 	"projectplanner/internal/model"
@@ -109,6 +111,65 @@ type HackathonSchedule struct {
 	Segments           []Segment `json:"segments"`
 	PlanningMinutes    int       `json:"planning_minutes"`
 	MaxPlanningMinutes int       `json:"max_planning_minutes"`
+	// Hours you will not be coding (sleep, meals, travel), and what is left once they are taken out.
+	Breaks           []Break `json:"breaks"`
+	WorkMinutes      int     `json:"work_minutes"`       // the whole event minus breaks
+	BuildWorkMinutes int     `json:"build_work_minutes"` // the build segment minus breaks
+}
+
+// Break is a stretch of a hackathon you will not be working in.
+type Break struct {
+	ID    int64     `json:"id"`
+	Label string    `json:"label"`
+	Start time.Time `json:"start"`
+	End   time.Time `json:"end"`
+}
+
+// applyBreaks reads the "break" entries of the blueprint into the schedule and works out how
+// much working time the event and its build segment really hold.
+func (h *HackathonSchedule) applyBreaks(items []model.PlanItem) {
+	h.Breaks = []Break{}
+	for _, it := range items {
+		if it.Kind != "break" {
+			continue
+		}
+		var d struct {
+			Label string    `json:"label"`
+			Start time.Time `json:"start"`
+			End   time.Time `json:"end"`
+		}
+		if json.Unmarshal(it.Data, &d) != nil || !d.End.After(d.Start) {
+			continue
+		}
+		h.Breaks = append(h.Breaks, Break{ID: it.ID, Label: d.Label, Start: d.Start, End: d.End})
+	}
+	sort.Slice(h.Breaks, func(i, j int) bool { return h.Breaks[i].Start.Before(h.Breaks[j].Start) })
+	h.WorkMinutes = int((h.End.Sub(h.Start) - offTime(h.Breaks, h.Start, h.End)) / time.Minute)
+	for _, seg := range h.Segments {
+		if seg.Key == "build" {
+			h.BuildWorkMinutes = int((seg.End.Sub(seg.Start) - offTime(h.Breaks, seg.Start, seg.End)) / time.Minute)
+		}
+	}
+}
+
+// offTime is how much of the span from..to is covered by breaks; overlapping breaks count once.
+func offTime(breaks []Break, from, to time.Time) time.Duration {
+	var off time.Duration
+	cursor := from
+	for _, b := range breaks { // sorted by start
+		start, end := b.Start, b.End
+		if start.Before(cursor) {
+			start = cursor
+		}
+		if end.After(to) {
+			end = to
+		}
+		if end.After(start) {
+			off += end.Sub(start)
+			cursor = end
+		}
+	}
+	return off
 }
 
 // Schedule splits a hackathon into plan → build → polish → submit.
@@ -151,4 +212,64 @@ func clamp(d, lo, hi time.Duration) time.Duration {
 		return hi
 	}
 	return d
+}
+
+// ---------- scope and time honesty ----------
+
+// scopeBudget caps how many user stories fit in the MVP of a standard project, by size.
+var scopeBudget = map[string]int{"tiny": 3, "small": 5, "medium": 8, "hard": 12}
+
+// ScopeBudget is the number of user stories the MVP of this project may hold. Adding one more
+// means moving another out first. A hackathon's budget follows the length of the event.
+func ScopeBudget(p model.Project) int {
+	if p.Type == model.TypeHackathon && p.HackStart != nil && p.HackEnd != nil {
+		switch dur := p.HackEnd.Sub(*p.HackStart); {
+		case dur <= 12*time.Hour:
+			return 2
+		case dur <= 30*time.Hour:
+			return 3
+		case dur <= 3*day:
+			return 4
+		default:
+			return 6
+		}
+	}
+	if n, ok := scopeBudget[p.Complexity]; ok {
+		return n
+	}
+	return scopeBudget["medium"]
+}
+
+// DefaultStaleHours is how long a task may sit in progress before it is flagged: two days for
+// a normal project, a twelfth of the event (1 to 12 hours) in a hackathon.
+func DefaultStaleHours(projectType string, hackStart, hackEnd *time.Time) int {
+	if projectType == model.TypeHackathon && hackStart != nil && hackEnd != nil {
+		return int(clamp(hackEnd.Sub(*hackStart)/12, time.Hour, 12*time.Hour) / time.Hour)
+	}
+	return 48
+}
+
+// StuckWindow is how long one attempt at an obstacle lasts before the planner asks for a
+// different approach or outside help.
+func StuckWindow(p model.Project) time.Duration {
+	if p.Type == model.TypeHackathon {
+		return 10 * time.Minute
+	}
+	return 20 * time.Minute
+}
+
+// QuestionBox is the time an open feasibility question gets before it has to be decided or
+// pushed to "learn while building": a tenth of the planning window, 15 minutes to a day.
+func QuestionBox(p model.Project) time.Duration {
+	start, end := PlanningWindow(p)
+	return clamp(end.Sub(start)/10, 15*time.Minute, day).Truncate(time.Minute)
+}
+
+// CutSnooze is how long the "cut or move the date" prompt of a slipped milestone stays quiet
+// after something was cut for it.
+func CutSnooze(p model.Project) time.Duration {
+	if p.Type == model.TypeHackathon && p.HackStart != nil && p.HackEnd != nil {
+		return clamp(p.HackEnd.Sub(*p.HackStart)/20, 15*time.Minute, 4*time.Hour)
+	}
+	return day
 }

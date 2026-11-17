@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 
 	"projectplanner/internal/model"
@@ -9,11 +10,18 @@ import (
 
 // ---------- stories ----------
 
-const storyCols = `id, project_id, text, tier, position, created_at`
+const storyCols = `id, project_id, text, tier, position, cut_rank, created_at`
 
 func scanStory(row scanner) (model.Story, error) {
-	var s model.Story
-	err := row.Scan(&s.ID, &s.ProjectID, &s.Text, &s.Tier, &s.Position, &s.CreatedAt)
+	var (
+		s    model.Story
+		rank sql.NullInt64
+	)
+	err := row.Scan(&s.ID, &s.ProjectID, &s.Text, &s.Tier, &s.Position, &rank, &s.CreatedAt)
+	if rank.Valid {
+		r := int(rank.Int64)
+		s.CutRank = &r
+	}
 	return s, notFound(err)
 }
 
@@ -48,8 +56,8 @@ func (s *Store) CreateStory(ctx context.Context, st model.Story) (model.Story, e
 
 func (s *Store) UpdateStory(ctx context.Context, st model.Story) (model.Story, error) {
 	return scanStory(s.q.QueryRowContext(ctx, `
-		UPDATE stories SET text = $2, tier = $3, position = $4 WHERE id = $1
-		RETURNING `+storyCols, st.ID, st.Text, st.Tier, st.Position))
+		UPDATE stories SET text = $2, tier = $3, position = $4, cut_rank = $5 WHERE id = $1
+		RETURNING `+storyCols, st.ID, st.Text, st.Tier, st.Position, st.CutRank))
 }
 
 func (s *Store) DeleteStory(ctx context.Context, id int64) error {
@@ -108,4 +116,26 @@ func (s *Store) UpdateItem(ctx context.Context, it model.PlanItem) (model.PlanIt
 
 func (s *Store) DeleteItem(ctx context.Context, id int64) error {
 	return affected(s.q.ExecContext(ctx, `DELETE FROM plan_items WHERE id = $1`, id))
+}
+
+// CountStories counts the stories of a project in one tier, leaving out one story id.
+func (s *Store) CountStories(ctx context.Context, projectID int64, tier string, exceptID int64) (int, error) {
+	var n int
+	err := s.q.QueryRowContext(ctx,
+		`SELECT count(*) FROM stories WHERE project_id = $1 AND tier = $2 AND id <> $3`, projectID, tier, exceptID).Scan(&n)
+	return n, err
+}
+
+// SetCutOrder ranks the given stories 1..n (first to cut first) and clears every other rank.
+func (s *Store) SetCutOrder(ctx context.Context, projectID int64, storyIDs []int64) error {
+	if _, err := s.q.ExecContext(ctx, `UPDATE stories SET cut_rank = NULL WHERE project_id = $1`, projectID); err != nil {
+		return err
+	}
+	for i, id := range storyIDs {
+		if _, err := s.q.ExecContext(ctx,
+			`UPDATE stories SET cut_rank = $3 WHERE id = $1 AND project_id = $2`, id, projectID, i+1); err != nil {
+			return err
+		}
+	}
+	return nil
 }

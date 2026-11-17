@@ -3,8 +3,9 @@ import { Link } from 'react-router-dom';
 import { api } from '../api';
 import { useGit } from '../components/hooks';
 import { TodayLog } from '../components/TodayLog';
+import { PickOutcomes } from '../components/TodayThree';
 import { Badge, Card, ConfirmButton, Empty, Icon, SavedText } from '../components/ui';
-import { activeDays, todayKey } from '../lib';
+import { activeDays, picksFor, todayKey } from '../lib';
 import { useProject } from '../store';
 import { addDays, dayKey, fmtDateTime, fmtLongDate, fromDayKey, streak } from '../time';
 
@@ -18,6 +19,8 @@ export default function Journal() {
   const totalHours = b.logs.reduce((sum, l) => sum + (l.hours ?? 0), 0);
   const [pastDay, setPastDay] = useState('');
   const [pastText, setPastText] = useState('');
+  const logged = new Set(b.logs.map((l) => l.day));
+  const unloggedPickDays = [...new Set(b.picks.map((k) => k.day))].filter((d) => !logged.has(d) && d !== todayKey() && picksFor(b, d).length > 0).sort().reverse().slice(0, 7);
 
   const addPast = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,9 +57,23 @@ export default function Journal() {
                   </div>
                   <SavedText multiline minRows={1} value={l.summary} ariaLabel={`Entry for ${l.day}`}
                     required onSave={(v) => { void run(() => api.saveLog(p.id, l.day, { summary: v, hours: l.hours })); }} />
+                  <PickOutcomes day={l.day} />
                 </li>
               ))}
             </ul>
+          )}
+          {unloggedPickDays.length > 0 && (
+            <div className="unlogged-picks">
+              <h4>Days with picks but no entry</h4>
+              <ul className="log-list">
+                {unloggedPickDays.map((day) => (
+                  <li key={day}>
+                    <div className="log-day"><strong>{fmtLongDate(fromDayKey(day))}</strong></div>
+                    <PickOutcomes day={day} />
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
           <details className="past-entry">
             <summary>Add an entry for another day</summary>
@@ -97,6 +114,8 @@ export default function Journal() {
                   <li key={c.hash}>
                     <code>{c.hash.slice(0, 7)}</code>
                     <span className="commit-subject">{c.subject}</span>
+                    {c.closes?.map((id) => <Link key={`c${id}`} className="commit-ref closes" to={`../board?task=${id}`} relative="path" title="This commit closed the task">✓ #{id}</Link>)}
+                    {c.refs?.filter((id) => !c.closes?.includes(id)).map((id) => <Link key={`r${id}`} className="commit-ref" to={`../board?task=${id}`} relative="path">#{id}</Link>)}
                     <time dateTime={c.at}>{fmtDateTime(c.at)}</time>
                   </li>
                 ))}

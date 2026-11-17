@@ -1,5 +1,6 @@
 import { useCallback, useEffect } from 'react';
-import { Link, NavLink, Outlet, useParams } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation, useParams } from 'react-router-dom';
+import { PencilsDown } from '../components/PencilsDown';
 import { ClockChip } from '../components/Clock';
 import { Badge, Icon, Spinner } from '../components/ui';
 import { clockState } from '../lib';
@@ -50,6 +51,26 @@ function Shell() {
   const onZero = useCallback(() => { void reload(); }, [reload]);
   const openObstacles = b.obstacles.filter((o) => o.status === 'open').length;
   const planning = p.phase === 'plan';
+  const location = useLocation();
+
+  // The first time a project is opened after planning ended, nothing else is shown.
+  if (!planning && !p.build_ack_at && !p.archived) {
+    return (
+      <>
+        <TitleClock />
+        <PencilsDown />
+      </>
+    );
+  }
+  // The focus screen replaces the project chrome: one task and the clock.
+  if (/\/focus\/?$/.test(location.pathname)) {
+    return (
+      <>
+        <TitleClock />
+        <Outlet />
+      </>
+    );
+  }
 
   return (
     <>
@@ -67,6 +88,7 @@ function Shell() {
               {p.archived && <Badge>Archived</Badge>}
             </div>
           </div>
+          {p.phase === 'build' && !p.archived && <Link className="btn btn-sm focus-link" to="focus" title="One task and the clock, nothing else"><Icon name="play" size={12} /> Focus</Link>}
           <ClockChip b={b} onZero={onZero} />
         </div>
         <nav className="tabs" aria-label="Project sections">

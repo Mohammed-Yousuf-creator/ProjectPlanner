@@ -1,12 +1,17 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { HackTimeline, HeroClock, useClock } from '../components/Clock';
 import { ExpansionPack } from '../components/ExpansionPack';
+import { CutPrompt, EstimatesCard, MovesCard, PaceCard, ScopeCard, StaleNotice } from '../components/Honesty';
+import { RetroCard } from '../components/Retro';
+import { SnapshotCard } from '../components/Snapshot';
+import { TodayThree } from '../components/TodayThree';
 import { useGit, useTaskActions } from '../components/hooks';
 import { TodayLog } from '../components/TodayLog';
 import { Badge, Card, Empty, Icon, Modal, Progress } from '../components/ui';
-import { checklistProgress, currentStreak, expectedProgress, nextMilestone, taskProgress, todayKey } from '../lib';
+import { checklistProgress, currentStreak, effortLabel, expectedProgress, nextMilestone, taskProgress, todayKey } from '../lib';
+import type { Meta } from '../types';
 import { useProject } from '../store';
 import { dueLabel, fmtDateTime, roughly } from '../time';
 
@@ -213,8 +218,15 @@ function BuildOverview({ now }: { now: number }) {
   const loggedToday = b.logs.some((l) => l.day === todayKey());
   const allDone = total > 0 && done === total;
   const commitsToday = git?.ok ? git.commits.filter((c) => new Date(c.at).toDateString() === new Date().toDateString()).length : 0;
+  const [meta, setMeta] = useState<Meta | null>(null);
+  useEffect(() => { api.meta().then(setMeta).catch(() => undefined); }, []);
+  const building = p.phase === 'build';
 
   return (
+    <>
+    {building && <CutPrompt now={now} />}
+    {building && <StaleNotice now={now} />}
+    {p.phase === 'shipped' && <RetroCard />}
     <div className="grid-2">
       <div className="stack">
         <Card title="Now" tone="accent" aside={doing.length > 1 ? <Badge tone="danger" title="One thing at a time keeps you in flow">{doing.length} in progress</Badge> : undefined}>
@@ -243,7 +255,10 @@ function BuildOverview({ now }: { now: number }) {
                 <div key={t.id} className="focus-task">
                   <div className="focus-task-head">
                     <h4>{t.title}</h4>
-                    {t.due_at && <DueBadge iso={t.due_at} now={now} />}
+                    <span className="badges">
+                      {effortLabel(t) && <Badge title="Time spent / estimate">{effortLabel(t)}</Badge>}
+                      {t.due_at && <DueBadge iso={t.due_at} now={now} />}
+                    </span>
                   </div>
                   {t.notes && <p className="muted pre">{t.notes}</p>}
                   {t.checklist.length > 0 && (
@@ -262,6 +277,7 @@ function BuildOverview({ now }: { now: number }) {
                       title={cp.total > cp.done ? 'Some sub-steps are still open' : undefined}>
                       <Icon name="check" /> Done
                     </button>
+                    <Link className="btn" to="focus"><Icon name="play" size={13} /> Focus</Link>
                     <Link className="btn btn-ghost" to={`obstacles?task=${t.id}`}>I'm stuck</Link>
                     <button className="btn btn-ghost" onClick={() => actions.setStatus(t, 'todo')}>Put back</button>
                   </div>
@@ -271,18 +287,22 @@ function BuildOverview({ now }: { now: number }) {
           )}
         </Card>
 
+        {building && <TodayThree />}
+
         <Card title="Today" aside={<span className="muted">{streak > 0 ? `${streak}-day streak` : 'No streak yet'}</span>}>
           <TodayLog compact />
           {!loggedToday && streak > 0 && <p className="muted small">Log today to keep the streak going.</p>}
         </Card>
 
         {p.phase === 'shipped' && <ExpansionPack />}
+        <PaceCard now={now} />
+        <EstimatesCard overall={meta ? { multiplier: meta.multiplier, tasks: meta.multiplier_tasks } : null} />
       </div>
 
       <div className="stack">
         <Card title={p.phase === 'shipped' ? 'Progress' : 'MVP progress'} aside={<span className="muted">{done}/{total}</span>}>
           <Progress value={done} max={total} tone="ok" label="MVP tasks done" />
-          {milestone ? (
+          {p.phase === 'shipped' ? null : milestone ? (
             <p className="milestone-next">
               <Icon name="flag" size={14} /> Next milestone: <strong>{milestone.title}</strong>
               {milestone.due_at && <> <DueBadge iso={milestone.due_at} now={now} /></>}
@@ -332,9 +352,13 @@ function BuildOverview({ now }: { now: number }) {
           </Card>
         )}
 
+        <ScopeCard />
+        <MovesCard />
+        <SnapshotCard />
         <WhyCard />
       </div>
     </div>
+    </>
   );
 }
 

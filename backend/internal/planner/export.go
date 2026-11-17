@@ -59,6 +59,12 @@ func renderMarkdown(b *Bundle) string {
 	}
 	if p.HackStart != nil && p.HackEnd != nil {
 		line("- Hackathon: %s → %s", stamp(*p.HackStart), stamp(*p.HackEnd))
+		if h := b.Hackathon; h != nil && len(h.Breaks) > 0 {
+			line("- Real working time: %d h %02d min, after these hours off:", h.WorkMinutes/60, h.WorkMinutes%60)
+			for _, br := range h.Breaks {
+				line("  - %s: %s → %s", br.Label, stamp(br.Start), stamp(br.End))
+			}
+		}
 	}
 	if p.TargetDate != nil {
 		line("- Target date: %s", *p.TargetDate)
@@ -83,11 +89,14 @@ func renderMarkdown(b *Bundle) string {
 	line("## 2. Feasibility & unknowns\n")
 	text("Feasibility notes", "feasibility_notes")
 	for _, q := range items["question"] {
-		mark := " "
-		if str(q, "status") == "answered" {
+		mark, note := " ", ""
+		switch str(q, "status") {
+		case "answered":
 			mark = "x"
+		case "learn":
+			note = " _(learn while building)_"
 		}
-		line("- [%s] %s", mark, str(q, "text"))
+		line("- [%s] %s%s", mark, str(q, "text"), note)
 		if a := str(q, "answer"); a != "" {
 			line("  - %s", strings.ReplaceAll(a, "\n", "\n    "))
 		}
@@ -116,6 +125,14 @@ func renderMarkdown(b *Bundle) string {
 		line("**%s**\n", tier.title)
 		for _, st := range list {
 			line("- %s", st.Text)
+		}
+		line("")
+	}
+
+	if nd := items["notdoing"]; len(nd) > 0 {
+		line("**Not doing** — decided on purpose, so it does not creep back in\n")
+		for _, n := range nd {
+			line("- %s%s", str(n, "text"), dash(str(n, "why")))
 		}
 		line("")
 	}
@@ -206,7 +223,11 @@ func renderMarkdown(b *Bundle) string {
 			if t.Status == "done" {
 				mark = "x"
 			}
-			line("- [%s] %s", mark, t.Title)
+			extra := ""
+			if t.Scope == "dlc" {
+				extra = " _(later)_"
+			}
+			line("- [%s] #%d %s%s", mark, t.ID, t.Title, extra)
 			for _, c := range t.Checklist {
 				sub := " "
 				if c.Done {
@@ -230,7 +251,110 @@ func renderMarkdown(b *Bundle) string {
 		writeTasks(loose)
 		line("")
 	}
+
+	if ds := items["decision"]; len(ds) > 0 {
+		line("## Decision log\n")
+		for _, d := range ds {
+			when := ""
+			if t, ok := parseTime(d["decided_at"]); ok {
+				when = t.Local().Format("2 Jan 2006") + " — "
+			}
+			line("### %s%s\n", when, str(d, "title"))
+			kv(&w, "Decided", str(d, "decision"))
+			kv(&w, "Why", str(d, "why"))
+			kv(&w, "Instead of", str(d, "alternatives"))
+			if step := str(d, "step"); step != "" {
+				kv(&w, "Planning step", stepTitle(step))
+			}
+			line("")
+		}
+	}
+
+	var moves []dateMove
+	added, parked, cut := 0, 0, 0
+	for _, e := range b.Events {
+		switch e.Kind {
+		case "date_move":
+			var m dateMove
+			if json.Unmarshal(e.Data, &m) == nil {
+				moves = append(moves, m)
+			}
+		case "scope_add":
+			added++
+		case "scope_park":
+			parked++
+		case "scope_cut":
+			cut++
+		}
+	}
+	if len(moves) > 0 || added+parked+cut > 0 {
+		line("## Changes since coding started\n")
+		if added+parked+cut > 0 {
+			line("- Scope: %d added, %d parked for later, %d cut", added, parked, cut)
+		}
+		for _, m := range moves {
+			to := shortDate(m.To)
+			if to == "" {
+				to = "no date"
+			}
+			line("- %s moved from %s to %s — %s", m.Title, shortDate(m.From), to, m.Reason)
+		}
+		line("")
+	}
+
+	if r := b.Retro; r != nil {
+		line("## Retrospective\n")
+		line("- Planning: %.1f of %.1f hours used%s", r.PlanningUsedHours, r.PlanningAllowedHours,
+			map[bool]string{true: " — the deadline ended it", false: ""}[r.ForcedStart])
+		line("- Building: %.1f days, %d days with a journal entry, %.1f hours logged", r.BuildDays, r.DaysLogged, r.HoursLogged)
+		if r.DaysVsTarget != nil {
+			switch d := *r.DaysVsTarget; {
+			case d > 0:
+				line("- Shipped %d day(s) after the first ship date (%s)", d, *r.FirstTarget)
+			case d < 0:
+				line("- Shipped %d day(s) before the first ship date (%s)", -d, *r.FirstTarget)
+			default:
+				line("- Shipped on the first ship date (%s)", *r.FirstTarget)
+			}
+		}
+		line("- Tasks: %d done, %d still open, %d parked for later", r.TasksDone, r.TasksOpen, r.TasksParked)
+		if r.Multiplier > 0 {
+			line("- Estimates: tasks took %.2f× the time I estimated", r.Multiplier)
+		}
+		line("")
+		text("What went well", "retro_went_well")
+		text("What got in the way", "retro_hard")
+		text("What I will do differently next time", "retro_change")
+		if len(r.Obstacles) > 0 {
+			line("**Obstacles and how they were solved**\n")
+			for _, o := range r.Obstacles {
+				fix := o.Resolution
+				if fix == "" {
+					fix = "not solved"
+				}
+				line("- %s (%d attempts) — %s", o.Title, o.Attempts, strings.ReplaceAll(fix, "\n", " "))
+			}
+			line("")
+		}
+	}
 	return w.String()
+}
+
+// shortDate shows a stored date or timestamp as a day.
+func shortDate(s string) string {
+	if t, err := time.Parse(time.RFC3339, s); err == nil {
+		return t.Local().Format("2 Jan 2006")
+	}
+	return s
+}
+
+func stepTitle(key string) string {
+	for _, d := range stepDefs {
+		if d.Key == key {
+			return d.Title
+		}
+	}
+	return key
 }
 
 func kv(w *strings.Builder, key, value string) {
