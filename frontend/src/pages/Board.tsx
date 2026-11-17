@@ -1,10 +1,12 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { api } from '../api';
 import { ExpansionPack } from '../components/ExpansionPack';
 import { useTaskActions } from '../components/hooks';
 import { STATUS_LABEL, TaskModal } from '../components/TaskModal';
 import { AddInput, Badge, Empty, Icon, Modal, Progress, Segmented } from '../components/ui';
-import { checklistProgress } from '../lib';
+import { CutPrompt, StaleNotice } from '../components/Honesty';
+import { checklistProgress, effortLabel, hoursLabel, isStale } from '../lib';
 import { useProject, useToast } from '../store';
 import { MilestoneRow } from '../steps/build';
 import type { Task, TaskStatus } from '../types';
@@ -17,7 +19,16 @@ export default function Board() {
   const { b, p, run } = useProject();
   const toast = useToast();
   const now = useNow(30_000);
+  const [params, setParams] = useSearchParams();
   const [openId, setOpenId] = useState<number | null>(null);
+  // Links from the overview, search and notifications open a task directly: ?task=12
+  useEffect(() => {
+    const id = Number(params.get('task'));
+    if (id > 0) {
+      setOpenId(id);
+      setParams({}, { replace: true });
+    }
+  }, [params, setParams]);
   const [milestoneFilter, setMilestoneFilter] = useState<number | null>(null);
   const [scope, setScope] = useState<ScopeFilter>('all');
   const [managing, setManaging] = useState(false);
@@ -73,6 +84,9 @@ export default function Board() {
         </div>
       )}
 
+      <CutPrompt now={now} />
+      <StaleNotice now={now} />
+
       <div className="board-bar">
         <div className="milestone-strip" role="group" aria-label="Milestones">
           <button className={`milestone-pill ${milestoneFilter === null ? 'on' : ''}`} onClick={() => setMilestoneFilter(null)}>
@@ -121,7 +135,7 @@ export default function Board() {
               {tasks.map((t) => (
                 <div key={t.id}>
                   {drop && drop.status === status && drop.before === t.id && dragId !== t.id && <div className="drop-line" />}
-                  <TaskCard t={t} now={now} stuck={stuck.has(t.id)} dragging={dragId === t.id}
+                  <TaskCard t={t} now={now} stuck={stuck.has(t.id)} dragging={dragId === t.id} stale={isStale(t, p.stale_hours, now)}
                     milestone={milestoneFilter === null ? b.milestones.find((m) => m.id === t.milestone_id)?.title : undefined}
                     onOpen={() => setOpenId(t.id)}
                     onDragStart={() => setDragId(t.id)} onDragEnd={() => { setDragId(null); setDrop(null); }} />
@@ -183,15 +197,15 @@ function Column({ status, count, wipWarning, children, dragging, onDragOverColum
   );
 }
 
-function TaskCard({ t, now, stuck, milestone, dragging, onOpen, onDragStart, onDragEnd }: {
-  t: Task; now: number; stuck: boolean; milestone?: string; dragging: boolean;
+function TaskCard({ t, now, stuck, stale, milestone, dragging, onOpen, onDragStart, onDragEnd }: {
+  t: Task; now: number; stuck: boolean; stale: boolean; milestone?: string; dragging: boolean;
   onOpen: () => void; onDragStart: () => void; onDragEnd: () => void;
 }) {
   const actions = useTaskActions();
   const cp = checklistProgress(t);
   const due = t.due_at && t.status !== 'done' ? dueLabel(t.due_at, now) : null;
   return (
-    <article className={`task-card scope-${t.scope} ${dragging ? 'dragging' : ''}`} data-task={t.id} draggable
+    <article className={`task-card scope-${t.scope} ${dragging ? 'dragging' : ''} ${stale ? 'stale' : ''}`} data-task={t.id} draggable
       onDragStart={(e) => { e.dataTransfer.setData('text/plain', String(t.id)); e.dataTransfer.effectAllowed = 'move'; onDragStart(); }}
       onDragEnd={onDragEnd}>
       <button className="task-card-main" onClick={onOpen} aria-label={`Open task: ${t.title}`}>
@@ -200,6 +214,14 @@ function TaskCard({ t, now, stuck, milestone, dragging, onOpen, onDragStart, onD
           {t.scope === 'debt' && <Badge tone="accent" title="A planning decision to make while building">decide</Badge>}
           {t.scope === 'dlc' && <Badge tone="info">expansion</Badge>}
           {stuck && <Badge tone="danger">stuck</Badge>}
+          {stale && <Badge tone="danger" title="In progress too long">split or cut</Badge>}
+          <span className="meta-item meta-id">#{t.id}</span>
+          {(t.estimate_hours || t.spent_minutes > 0) && (
+            <span className={`meta-item ${t.estimate_hours && t.spent_minutes / 60 > t.estimate_hours * 1.25 ? 'overdue' : ''}`}
+              title={t.estimate_hours ? `Estimate ${t.estimate_hours} h${t.spent_minutes ? `, spent ${hoursLabel(t.spent_minutes)}` : ''}` : `Spent ${hoursLabel(t.spent_minutes)}`}>
+              {effortLabel(t)}
+            </span>
+          )}
           {cp.total > 0 && <span className="meta-item">{cp.done}/{cp.total}</span>}
           {due && <span className={`meta-item ${due.overdue ? 'overdue' : due.soon ? 'soon' : ''}`} title={fmtDateTime(t.due_at!)}>{due.text}</span>}
           {milestone && <span className="meta-item meta-milestone">{milestone}</span>}

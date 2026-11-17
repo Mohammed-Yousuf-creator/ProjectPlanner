@@ -4,7 +4,7 @@ import { api } from '../api';
 import { Badge, Card, ConfirmButton, Empty, Field, Icon, SavedText } from '../components/ui';
 import { useProject } from '../store';
 import type { Obstacle, ObstacleKind } from '../types';
-import { fmtDateTime } from '../time';
+import { clock, fmtDateTime, roughly, useNow } from '../time';
 
 type Kind = Exclude<ObstacleKind, 'unsorted'>;
 
@@ -119,6 +119,7 @@ function OpenObstacle({ o }: { o: Obstacle }) {
       title={<SavedText className="title-input" value={o.title} required onSave={(v) => { void patch({ title: v }); }} ariaLabel="Obstacle" />}
       aside={<ConfirmButton className="icon-btn" confirmLabel="Sure?" title="Delete" onConfirm={() => run(() => api.remove('obstacles', o.id))}><Icon name="trash" size={15} /></ConfirmButton>}>
       {task && <p className="muted small">On task: {task.title}</p>}
+      <StuckTimer o={o} />
 
       <Field label="What kind of obstacle is this?">
         <div className="kind-grid" role="radiogroup" aria-label="Kind of obstacle">
@@ -167,5 +168,60 @@ function OpenObstacle({ o }: { o: Obstacle }) {
         </>
       )}
     </Card>
+  );
+}
+
+/**
+ * The attempt window: a fixed stretch on one approach. When it ends the planner asks the
+ * question you would not ask yourself — try something different, or get help?
+ */
+function StuckTimer({ o }: { o: Obstacle }) {
+  const { b, run } = useProject();
+  const now = useNow(1000);
+  const [approach, setApproach] = useState('');
+  const window_ = b.limits.stuck_minutes;
+  const act = async (action: 'retry' | 'help') => {
+    const res = await run(() => api.stuck(o.id, action, approach));
+    if (res) setApproach('');
+  };
+
+  if (o.needs_help) {
+    return (
+      <div className="stuck-timer help">
+        <div className="stuck-timer-head">
+          <Badge tone="info">Getting outside help</Badge>
+          <span className="muted small">Ask a precise question: what you expected, what happened, what you already tried.</span>
+        </div>
+        <form className="row row-wrap" onSubmit={(e) => { e.preventDefault(); void act('retry'); }}>
+          <input className="input row-main" value={approach} onChange={(e) => setApproach(e.target.value)} placeholder="Got an idea from it? Write the approach you will try next" aria-label="Next approach" />
+          <button className="btn btn-sm" type="submit" disabled={!approach.trim()}>Try it for {window_} min</button>
+        </form>
+      </div>
+    );
+  }
+  if (!o.timer_until) return null;
+  const left = new Date(o.timer_until).getTime() - now;
+
+  if (left > 0) {
+    return (
+      <div className="stuck-timer running">
+        <Icon name="clock" size={14} />
+        <span className="stuck-clock">{clock(left)}</span>
+        <span className="muted small">left on this attempt. When it runs out: a different approach, or outside help — not more of the same.</span>
+      </div>
+    );
+  }
+  return (
+    <div className="stuck-timer over" role="alert">
+      <div className="stuck-timer-head">
+        <strong><Icon name="alert" size={15} /> Still stuck? This attempt ended {roughly(-left)} ago.</strong>
+        <span className="muted small">{window_} minutes on one approach is enough to know it is not working. Choose:</span>
+      </div>
+      <form className="row row-wrap" onSubmit={(e) => { e.preventDefault(); void act('retry'); }}>
+        <input className="input row-main" value={approach} onChange={(e) => setApproach(e.target.value)} placeholder="A different approach: what will you try now?" aria-label="A different approach" />
+        <button className="btn btn-sm btn-primary" type="submit" disabled={!approach.trim()}>Try that for {window_} min</button>
+        <button className="btn btn-sm" type="button" onClick={() => act('help')}>Get outside help</button>
+      </form>
+    </div>
   );
 }

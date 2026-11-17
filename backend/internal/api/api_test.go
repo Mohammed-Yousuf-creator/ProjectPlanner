@@ -33,6 +33,8 @@ type env struct {
 	t       *testing.T
 	srv     *httptest.Server
 	db      *sql.DB
+	svc     *planner.Service
+	dbURL   string
 	dataDir string
 	mu      sync.Mutex
 	now     time.Time
@@ -59,7 +61,7 @@ func setup(t *testing.T) *env {
 	if err := database.Migrate(ctx, db); err != nil {
 		t.Fatal(err)
 	}
-	e := &env{t: t, db: db, dataDir: t.TempDir(), now: time.Now().UTC().Truncate(time.Second)}
+	e := &env{t: t, db: db, dbURL: url, dataDir: t.TempDir(), now: time.Now().UTC().Truncate(time.Second)}
 	files, err := filestore.New(e.dataDir)
 	if err != nil {
 		t.Fatal(err)
@@ -70,7 +72,8 @@ func setup(t *testing.T) *env {
 		defer e.mu.Unlock()
 		return e.now
 	})
-	e.srv = httptest.NewServer(api.New(svc, ""))
+	e.svc = svc
+	e.srv = httptest.NewServer(api.New(svc, "", nil))
 	t.Cleanup(func() { e.srv.Close(); db.Close() })
 	return e
 }

@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api';
+import { YearHeatmap } from '../components/YearHeatmap';
 import { Badge, Empty, Field, Icon, Modal, Progress, Segmented, Spinner } from '../components/ui';
 import { useToast } from '../store';
-import type { Complexity, Meta, ProjectSummary, ProjectType, VendorMode } from '../types';
+import { times } from '../lib';
+import type { Activity, Complexity, Lesson, Meta, ProjectSummary, ProjectType, VendorMode } from '../types';
 import { clock, DAY, fmtDateTime, fromLocalInput, roughly, toLocalInput, useNow } from '../time';
 
+// Fallback until /api/meta has answered; the server knows which steps each kind of project has.
 const STEP_COUNT = { standard: 10, hackathon: 5 } as const;
 
 export default function Dashboard() {
@@ -13,9 +16,15 @@ export default function Dashboard() {
   const [error, setError] = useState('');
   const [creating, setCreating] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
+  const [meta, setMeta] = useState<Meta | null>(null);
+  const [activity, setActivity] = useState<Activity | null>(null);
+  const [lessons, setLessons] = useState<Lesson[]>([]);
 
   const load = useCallback(() => {
     api.projects().then((list) => { setProjects(list); setError(''); }).catch((e: Error) => setError(e.message));
+    api.meta().then(setMeta).catch(() => undefined);
+    api.activity().then(setActivity).catch(() => undefined);
+    api.lessons().then(setLessons).catch(() => undefined);
   }, []);
   useEffect(() => {
     document.title = 'ProjectPlanner';
@@ -52,24 +61,47 @@ export default function Dashboard() {
       )}
 
       <div className="project-grid">
-        {active.map((p) => <ProjectCard key={p.id} p={p} onReload={load} />)}
+        {active.map((p) => <ProjectCard key={p.id} p={p} onReload={load} stepKeys={meta?.step_keys[p.type]} />)}
       </div>
+
+      {activity && (projects?.length ?? 0) > 0 && (
+        <section className="card activity-card">
+          <header className="card-head">
+            <h3>The last year, across every project</h3>
+            <div className="card-aside">
+              {activity.multiplier > 0 && (
+                <span title={`Actual time over estimated time, across ${activity.tasks} finished tasks`}>
+                  Tasks take you <strong>{times(activity.multiplier)}</strong> your estimate
+                </span>
+              )}
+            </div>
+          </header>
+          <YearHeatmap activity={activity} />
+        </section>
+      )}
+
+      {lessons.length > 0 && (
+        <section className="card lessons-card">
+          <header className="card-head"><h3>What past projects taught you</h3></header>
+          <LessonList lessons={lessons.slice(0, 6)} />
+        </section>
+      )}
 
       {archived.length > 0 && (
         <section className="archived">
           <button className="btn btn-ghost" onClick={() => setShowArchived((v) => !v)}>
             {showArchived ? 'Hide' : 'Show'} archived ({archived.length})
           </button>
-          {showArchived && <div className="project-grid">{archived.map((p) => <ProjectCard key={p.id} p={p} onReload={load} />)}</div>}
+          {showArchived && <div className="project-grid">{archived.map((p) => <ProjectCard key={p.id} p={p} onReload={load} stepKeys={meta?.step_keys[p.type]} />)}</div>}
         </section>
       )}
 
-      {creating && <NewProject onClose={() => setCreating(false)} />}
+      {creating && <NewProject onClose={() => setCreating(false)} lessons={lessons} />}
     </main>
   );
 }
 
-function ProjectCard({ p, onReload }: { p: ProjectSummary; onReload: () => void }) {
+function ProjectCard({ p, onReload, stepKeys }: { p: ProjectSummary; onReload: () => void; stepKeys?: string[] }) {
   const now = useNow(1000);
   const deadline = new Date(p.planning_deadline).getTime();
   const hackStart = p.hack_start ? new Date(p.hack_start).getTime() : null;
@@ -96,8 +128,10 @@ function ProjectCard({ p, onReload }: { p: ProjectSummary; onReload: () => void 
     line = { label: 'MVP', time: 'Shipped', tone: 'ok' };
   }
 
-  const stepsDone = Object.values(p.steps).filter((s) => s === 'done' || s === 'skipped').length;
-  const stepsTotal = STEP_COUNT[p.type];
+  // Count only the steps this kind of project has: a hackathon has five, not ten.
+  const keys = stepKeys ?? Object.keys(p.steps).slice(0, STEP_COUNT[p.type]);
+  const stepsTotal = stepKeys?.length ?? STEP_COUNT[p.type];
+  const stepsDone = keys.filter((k) => p.steps[k] === 'done' || p.steps[k] === 'skipped').length;
 
   return (
     <Link to={`/p/${p.id}`} className={`project-card ${p.archived ? 'is-archived' : ''}`}>
@@ -111,6 +145,7 @@ function ProjectCard({ p, onReload }: { p: ProjectSummary; onReload: () => void 
         </div>
       </div>
       {p.summary && <p className="project-card-summary">{p.summary}</p>}
+      {p.archived && p.archive_reason && <p className="project-card-reason">Stopped: {p.archive_reason}</p>}
 
       <div className={`project-card-clock tone-${line.tone}`}>
         <span>{line.label}</span>
@@ -144,7 +179,21 @@ const SIZES: { value: Complexity; label: string; blurb: string }[] = [
   { value: 'hard', label: 'Hard', blurb: 'Big, unfamiliar, lots of unknowns' },
 ];
 
-function NewProject({ onClose }: { onClose: () => void }) {
+function LessonList({ lessons }: { lessons: Lesson[] }) {
+  return (
+    <ul className="lesson-list">
+      {lessons.map((l, i) => (
+        <li key={i} className={`lesson lesson-${l.kind}`}>
+          <Badge tone={l.kind === 'abandoned' ? 'danger' : 'ok'}>{l.kind === 'abandoned' ? 'dropped' : 'shipped'}</Badge>
+          <span className="lesson-text">{l.text}</span>
+          <Link className="lesson-from muted small" to={`/p/${l.project_id}`}>{l.project}</Link>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function NewProject({ onClose, lessons }: { onClose: () => void; lessons: Lesson[] }) {
   const navigate = useNavigate();
   const toast = useToast();
   const now = useNow(30_000);
@@ -157,8 +206,14 @@ function NewProject({ onClose }: { onClose: () => void }) {
   const [hackStart, setHackStart] = useState(() => toLocalInput(new Date()));
   const [hackEnd, setHackEnd] = useState(() => toLocalInput(new Date(Date.now() + DAY)));
   const [busy, setBusy] = useState(false);
+  const [kit, setKit] = useState('');
 
   useEffect(() => { api.meta().then(setMeta).catch(() => {}); }, []);
+
+  const building = type === 'standard' ? meta?.building ?? [] : [];
+  const mode = meta?.one_build_mode ?? 'warn';
+  const blocked = building.length > 0 && mode === 'block';
+  const chosenKit = meta?.kits.find((k) => k.key === kit);
 
   const days = meta?.planning_days[size] ?? { tiny: 1, small: 3, medium: 7, hard: 14 }[size];
   const maxDays = meta?.max_planning_days ?? 14;
@@ -176,10 +231,10 @@ function NewProject({ onClose }: { onClose: () => void }) {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || hackProblem || busy) return;
+    if (!name.trim() || hackProblem || busy || blocked) return;
     setBusy(true);
     try {
-      const body: Record<string, unknown> = { name, summary, type, complexity: size, vendor_mode: effectiveVendor };
+      const body: Record<string, unknown> = { name, summary, type, complexity: size, vendor_mode: effectiveVendor, kit };
       if (type === 'hackathon') {
         body.hack_start = fromLocalInput(hackStart);
         body.hack_end = fromLocalInput(hackEnd);
@@ -195,6 +250,26 @@ function NewProject({ onClose }: { onClose: () => void }) {
   return (
     <Modal title="New project" onClose={onClose} wide>
       <form onSubmit={submit} className="form">
+        {building.length > 0 && mode !== 'off' && (
+          <div className={`notice ${blocked ? 'notice-danger' : 'notice-warn'}`}>
+            <Icon name="alert" size={16} />
+            <div>
+              <strong>{building.length === 1 ? `“${building[0]}” is not finished.` : `${building.length} projects are not finished: ${building.join(', ')}.`}</strong>
+              <p className="muted small">
+                {blocked
+                  ? 'You set the one-project rule to refuse a second build. Ship it, or archive it with a reason — then start this one.'
+                  : `A new idea is most attractive exactly when the current project gets hard. Is this one worth leaving ${building.length === 1 ? 'that one' : 'those'} unfinished?`}
+                {' '}<Link to="/settings" onClick={onClose}>Change the rule</Link>
+              </p>
+            </div>
+          </div>
+        )}
+        {lessons.length > 0 && (
+          <details className="lessons-inline">
+            <summary>Before you start: {lessons.length} note{lessons.length === 1 ? '' : 's'} from your past projects</summary>
+            <LessonList lessons={lessons.slice(0, 5)} />
+          </details>
+        )}
         <Field label="Name" htmlFor="np-name">
           <input id="np-name" className="input" value={name} onChange={(e) => setName(e.target.value)} maxLength={120}
             placeholder="e.g. Habit tracker" autoFocus required />
@@ -257,6 +332,27 @@ function NewProject({ onClose }: { onClose: () => void }) {
           </>
         )}
 
+        {meta && meta.kits.length > 0 && (
+          <Field label="Starter kit" hint="Optional. A kit fills in the stack layers, the usual unknowns and a first set of milestones for that kind of project. Everything it adds can be edited or deleted.">
+            <div className="kit-grid" role="radiogroup" aria-label="Starter kit">
+              <button type="button" role="radio" aria-checked={kit === ''} className={`choice-card ${kit === '' ? 'on' : ''}`} onClick={() => setKit('')}>
+                <strong>Blank</strong><span>Start from an empty plan</span>
+              </button>
+              {meta.kits.map((k) => (
+                <button key={k.key} type="button" role="radio" aria-checked={kit === k.key} className={`choice-card ${kit === k.key ? 'on' : ''}`} onClick={() => setKit(k.key)}>
+                  <strong>{k.label}</strong><span>{k.blurb}</span>
+                </button>
+              ))}
+            </div>
+            {chosenKit && (
+              <p className="muted small kit-detail">
+                Adds: {chosenKit.stack_layers.length} stack layers ({chosenKit.stack_layers.join(', ')}), {chosenKit.questions.length} question{chosenKit.questions.length === 1 ? '' : 's'} to
+                answer{type === 'standard' && chosenKit.milestones.length > 0 ? `, and the milestones ${chosenKit.milestones.join(' → ')}` : ''}.
+              </p>
+            )}
+          </Field>
+        )}
+
         <Field label="Auth, database, hosting…"
           hint="Your default for the plumbing. It is only a starting point — you decide per capability in the plan, and can change it any time.">
           <Segmented<VendorMode> ariaLabel="Approach" value={effectiveVendor} onChange={setVendor}
@@ -268,7 +364,7 @@ function NewProject({ onClose }: { onClose: () => void }) {
 
         <div className="form-actions">
           <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>
-          <button type="submit" className="btn btn-primary" disabled={!name.trim() || !!hackProblem || busy}>
+          <button type="submit" className="btn btn-primary" disabled={!name.trim() || !!hackProblem || busy || blocked}>
             {busy ? 'Creating…' : 'Decide & start the clock'}
           </button>
         </div>

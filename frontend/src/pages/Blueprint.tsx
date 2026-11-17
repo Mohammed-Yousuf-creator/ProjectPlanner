@@ -1,6 +1,7 @@
 import { type ComponentType } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api';
+import { DecisionLog } from '../components/Decisions';
 import { Badge, Icon } from '../components/ui';
 import { useProject } from '../store';
 import { GoalStep, MvpStep, ResearchStep, StoriesStep } from '../steps/define';
@@ -56,6 +57,7 @@ export default function Blueprint() {
         <a className="btn btn-sm btn-ghost export-link" href={api.exportUrl(p.id)} download>
           <Icon name="download" size={14} /> Export as PLAN.md
         </a>
+        <p className="stepper-decisions muted small">{b.items.filter((i) => i.kind === 'decision').length} decision{b.items.filter((i) => i.kind === 'decision').length === 1 ? '' : 's'} logged</p>
       </aside>
 
       <article className="step">
@@ -86,6 +88,7 @@ export default function Blueprint() {
 
         <div className="step-body">
           <View />
+          <DecisionLog step={step.key} />
         </div>
 
         <footer className="step-foot">

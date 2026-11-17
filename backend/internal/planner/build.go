@@ -96,8 +96,12 @@ func (s *Service) generate(ctx context.Context, tx *store.Store, p model.Project
 		if err != nil {
 			return 0, err
 		}
+		// Freeze the plan as it stands, before anything is generated on top of it.
+		if err := tx.SaveSnapshot(ctx, p.ID, anchor, takeSnapshot(p, stories, items, existingMs)); err != nil {
+			return 0, err
+		}
 		steps := ComputeSteps(p, planData{stories, items, existingMs, existing, files})
-		tasks = append(debtSeeds(steps), tasks...)
+		tasks = append(append(debtSeeds(steps), learnSeeds(items)...), tasks...)
 	}
 
 	msIDs := map[string]int64{}
@@ -198,6 +202,31 @@ func debtSeeds(steps []Step) []taskSeed {
 	return seeds
 }
 
+// learnSeeds turns every unknown that was pushed to "learn while building" — or was still open
+// when planning ended — into a task, so the question is answered at the point it matters.
+func learnSeeds(items []model.PlanItem) []taskSeed {
+	var seeds []taskSeed
+	for _, it := range items {
+		if it.Kind != "question" {
+			continue
+		}
+		var q struct {
+			Text   string `json:"text"`
+			Status string `json:"status"`
+		}
+		if json.Unmarshal(it.Data, &q) != nil || strings.TrimSpace(q.Text) == "" || q.Status == "answered" {
+			continue
+		}
+		seeds = append(seeds, taskSeed{
+			Origin: "learn:" + strconv.FormatInt(it.ID, 10),
+			Title:  "Learn while building: " + strings.TrimSpace(q.Text),
+			Notes:  "This unknown was not settled during planning. Learn just enough to answer it when a task needs it, then write the answer into the blueprint.",
+			Scope:  "debt",
+		})
+	}
+	return seeds
+}
+
 // buildSeeds derives milestones and tasks from the blueprint, in the order that keeps a solo
 // developer unblocked: skeleton → data layer → core logic / data flows → the MVP stories → deploy.
 func buildSeeds(p model.Project, stories []model.Story, items []model.PlanItem, anchor time.Time) ([]milestoneSeed, []taskSeed) {
@@ -259,17 +288,21 @@ func buildSeeds(p model.Project, stories []model.Story, items []model.PlanItem, 
 			t := endOfDay(anchor.Add(span * time.Duration(percent) / 100))
 			return &t
 		}
+		titles := [5]string{"Skeleton & first commit", "Data layer works", "Core logic works", "MVP stories done", "MVP shipped"}
+		skeleton := []string{"Folder structure (one folder per module)", "Development environment runs", "git init and first commit"}
+		if kit, ok := kitByKey(p.Kit); ok {
+			titles, skeleton = kit.Milestones, kit.Skeleton
+		}
 		ms = []milestoneSeed{
-			{"ms:skeleton", "Skeleton & first commit", at(5)},
-			{"ms:data", "Data layer works", at(25)},
-			{"ms:core", "Core logic works", at(55)},
-			{"ms:stories", "MVP stories done", at(85)},
-			{"ms:ship", "MVP shipped", at(100)},
+			{"ms:skeleton", titles[0], at(5)},
+			{"ms:data", titles[1], at(25)},
+			{"ms:core", titles[2], at(55)},
+			{"ms:stories", titles[3], at(85)},
+			{"ms:ship", titles[4], at(100)},
 		}
 		msSkeleton, msData, msCore, msStories, msShip = "ms:skeleton", "ms:data", "ms:core", "ms:stories", "ms:ship"
 		tasks = append(tasks, taskSeed{
-			Origin: "skeleton", Title: "Create the project skeleton", Milestone: msSkeleton, Scope: "mvp",
-			Checklist: []string{"Folder structure (one folder per module)", "Development environment runs", "git init and first commit"},
+			Origin: "skeleton", Title: "Create the project skeleton", Milestone: msSkeleton, Scope: "mvp", Checklist: skeleton,
 		})
 	}
 
@@ -315,10 +348,14 @@ func buildSeeds(p model.Project, stories []model.Story, items []model.PlanItem, 
 				Notes: "Work through the submission checklist on the Hackathon tab. Submit early; you can usually update it."},
 		)
 	} else {
-		tasks = append(tasks, taskSeed{
+		ship := taskSeed{
 			Origin: "deploy", Title: "Deploy the first working version", Milestone: msShip, Scope: "mvp",
 			Notes: "Deploy early and often, even if the app is not 100% complete.",
-		})
+		}
+		if kit, ok := kitByKey(p.Kit); ok {
+			ship.Title, ship.Notes = kit.ShipTask, "Get it into someone else's hands early, even if it is not 100% complete."
+		}
+		tasks = append(tasks, ship)
 	}
 	return ms, tasks
 }

@@ -37,6 +37,15 @@ type Project struct {
 	Steps            map[string]string `json:"steps"`
 	CreatedAt        time.Time         `json:"created_at"`
 	UpdatedAt        time.Time         `json:"updated_at"`
+
+	Kit                string     `json:"kit"`
+	ArchiveReason      string     `json:"archive_reason"`
+	ArchivedAt         *time.Time `json:"archived_at"`
+	BuildAckAt         *time.Time `json:"build_ack_at"`
+	OriginalTargetDate *string    `json:"original_target_date"` // YYYY-MM-DD
+	StaleHours         int        `json:"stale_hours"`
+	PlanSync           bool       `json:"plan_sync"`
+	CommitClose        bool       `json:"commit_close"`
 }
 
 // ProjectSummary is a project plus the few numbers the dashboard shows.
@@ -55,6 +64,7 @@ type Story struct {
 	Text      string    `json:"text"`
 	Tier      string    `json:"tier"`
 	Position  float64   `json:"position"`
+	CutRank   *int      `json:"cut_rank"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
@@ -76,6 +86,8 @@ type Milestone struct {
 	Position  float64    `json:"position"`
 	Origin    string     `json:"origin"`
 	CreatedAt time.Time  `json:"created_at"`
+
+	OriginalDueAt *time.Time `json:"original_due_at"`
 }
 
 type ChecklistItem struct {
@@ -99,6 +111,12 @@ type Task struct {
 	CreatedAt   time.Time       `json:"created_at"`
 	StartedAt   *time.Time      `json:"started_at"`
 	DoneAt      *time.Time      `json:"done_at"`
+
+	EstimateHours *float64 `json:"estimate_hours"`
+	SpentMinutes  int      `json:"spent_minutes"`
+	ClosedCommit  string   `json:"closed_commit"`
+	// Set only when creating a task by splitting another one: a split is not new scope.
+	SplitFrom *int64 `json:"split_from,omitempty"`
 }
 
 type DailyLog struct {
@@ -122,6 +140,9 @@ type Obstacle struct {
 	Status     string     `json:"status"`
 	CreatedAt  time.Time  `json:"created_at"`
 	ResolvedAt *time.Time `json:"resolved_at"`
+
+	TimerUntil *time.Time `json:"timer_until"`
+	NeedsHelp  bool       `json:"needs_help"`
 }
 
 type File struct {
@@ -135,4 +156,30 @@ type File struct {
 	Compression  string    `json:"compression"`
 	StorageKey   string    `json:"-"`
 	CreatedAt    time.Time `json:"created_at"`
+}
+
+// Event records something that happened to a project and cannot be read off its current rows.
+type Event struct {
+	ID        int64           `json:"id"`
+	ProjectID int64           `json:"project_id"`
+	Kind      string          `json:"kind"` // scope_add | scope_park | scope_cut | date_move
+	At        time.Time       `json:"at"`
+	Data      json.RawMessage `json:"data"`
+}
+
+// DayPick is one of the (at most three) tasks picked for a day.
+type DayPick struct {
+	ID        int64  `json:"id"`
+	ProjectID int64  `json:"project_id"`
+	Day       string `json:"day"` // YYYY-MM-DD
+	TaskID    *int64 `json:"task_id"`
+	Title     string `json:"title"`
+	Position  int    `json:"position"`
+}
+
+// Snapshot is the blueprint as it was when coding started.
+type Snapshot struct {
+	ProjectID int64           `json:"project_id"`
+	TakenAt   time.Time       `json:"taken_at"`
+	Data      json.RawMessage `json:"data"`
 }

@@ -9,16 +9,18 @@ import (
 	"path/filepath"
 	"strings"
 
+	"projectplanner/internal/backup"
 	"projectplanner/internal/planner"
 )
 
 type Server struct {
 	svc       *planner.Service
 	staticDir string
+	backups   *backup.Manager // nil when backups are not available (tests)
 }
 
-func New(svc *planner.Service, staticDir string) http.Handler {
-	s := &Server{svc: svc, staticDir: staticDir}
+func New(svc *planner.Service, staticDir string, backups *backup.Manager) http.Handler {
+	s := &Server{svc: svc, staticDir: staticDir, backups: backups}
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /api/health", s.health)
@@ -63,6 +65,30 @@ func New(svc *planner.Service, staticDir string) http.Handler {
 	mux.HandleFunc("POST /api/projects/{id}/files", s.uploadFile)
 	mux.HandleFunc("GET /api/files/{id}/content", s.fileContent)
 	mux.HandleFunc("DELETE /api/files/{id}", s.deleteFile)
+
+	// Across projects: settings, lessons, search, activity, import, backups.
+	mux.HandleFunc("GET /api/settings", s.getSettings)
+	mux.HandleFunc("PUT /api/settings", s.putSettings)
+	mux.HandleFunc("GET /api/lessons", s.lessons)
+	mux.HandleFunc("GET /api/search", s.search)
+	mux.HandleFunc("GET /api/activity", s.activity)
+	mux.HandleFunc("GET /api/alerts", s.alerts)
+	mux.HandleFunc("POST /api/import", s.importProject)
+	mux.HandleFunc("GET /api/backups", s.listBackups)
+	mux.HandleFunc("POST /api/backups", s.createBackup)
+	mux.HandleFunc("POST /api/backups/{name}/restore", s.restoreBackup)
+	mux.HandleFunc("DELETE /api/backups/{name}", s.deleteBackup)
+
+	// Keeping scope and time honest.
+	mux.HandleFunc("GET /api/projects/{id}/export.zip", s.exportArchive)
+	mux.HandleFunc("GET /api/projects/{id}/calendar.ics", s.calendar)
+	mux.HandleFunc("GET /api/projects/{id}/snapshot", s.snapshot)
+	mux.HandleFunc("GET /api/projects/{id}/status", s.status)
+	mux.HandleFunc("POST /api/projects/{id}/ack-build", s.ackBuild)
+	mux.HandleFunc("PUT /api/projects/{id}/picks/{day}", s.setPicks)
+	mux.HandleFunc("PUT /api/projects/{id}/cut-order", s.setCutOrder)
+	mux.HandleFunc("POST /api/projects/{id}/cut", s.cut)
+	mux.HandleFunc("POST /api/obstacles/{id}/stuck", s.stuck)
 
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "No such API endpoint.")

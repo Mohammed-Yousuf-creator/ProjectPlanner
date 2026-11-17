@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"projectplanner/internal/model"
@@ -60,15 +61,34 @@ func validateStory(st *model.Story) (err error) {
 }
 
 func (s *Service) CreateStory(ctx context.Context, projectID int64, st model.Story) (model.Story, error) {
-	if err := s.requireProject(ctx, projectID); err != nil {
+	p, err := s.store.GetProject(ctx, projectID)
+	if err != nil {
 		return st, err
 	}
-	st.ProjectID = projectID
+	st.ProjectID, st.CutRank = projectID, nil
 	if err := validateStory(&st); err != nil {
 		return st, err
 	}
+	if st.Tier == "mvp" {
+		if err := s.checkScopeBudget(ctx, p, 0); err != nil {
+			return st, err
+		}
+	}
 	defer s.store.Touch(ctx, projectID)
 	return s.store.CreateStory(ctx, st)
+}
+
+// checkScopeBudget refuses one more MVP story when the MVP is full: something has to move out
+// before something new moves in.
+func (s *Service) checkScopeBudget(ctx context.Context, p model.Project, exceptStory int64) error {
+	n, err := s.store.CountStories(ctx, p.ID, "mvp", exceptStory)
+	if err != nil {
+		return err
+	}
+	if budget := ScopeBudget(p); n >= budget {
+		return invalid("The MVP is full: %d stories is the budget for this project. Move one to Later or Cut before adding another.", budget)
+	}
+	return nil
 }
 
 func (s *Service) UpdateStory(ctx context.Context, id int64, patch []byte) (model.Story, error) {
@@ -80,10 +100,23 @@ func (s *Service) UpdateStory(ctx context.Context, id int64, patch []byte) (mode
 	if err := applyPatch(patch, &st); err != nil {
 		return old, err
 	}
-	st.ID, st.ProjectID, st.CreatedAt = old.ID, old.ProjectID, old.CreatedAt
+	st.ID, st.ProjectID, st.CreatedAt, st.CutRank = old.ID, old.ProjectID, old.CreatedAt, old.CutRank
 	if err := validateStory(&st); err != nil {
 		return old, err
 	}
+	if st.Tier == "mvp" && old.Tier != "mvp" {
+		p, err := s.store.GetProject(ctx, old.ProjectID)
+		if err != nil {
+			return old, err
+		}
+		if err := s.checkScopeBudget(ctx, p, old.ID); err != nil {
+			return old, err
+		}
+	}
+	if st.Tier != "mvp" {
+		st.CutRank = nil // only MVP stories are in the cut order
+	}
+	defer s.store.Touch(ctx, old.ProjectID)
 	return s.store.UpdateStory(ctx, st)
 }
 
@@ -95,7 +128,7 @@ func (s *Service) DeleteStory(ctx context.Context, id int64) error {
 
 // itemKinds lists the blueprint lists and, per kind, the fields that only accept fixed values.
 var itemKinds = map[string]map[string][]string{
-	"question":   {"status": {"open", "answered"}},                    // unknowns & decisions
+	"question":   {"status": {"open", "answered", "learn"}},           // unknowns; learn = while building
 	"resource":   {},                                                  // where to look when stuck
 	"entity":     {},                                                  // data models
 	"module":     {},                                                  // black boxes
@@ -104,6 +137,9 @@ var itemKinds = map[string]map[string][]string{
 	"flow":       {},                                                  // data flows (vertical slices)
 	"criterion":  {},                                                  // hackathon judging criteria
 	"submission": {},                                                  // hackathon submission checklist
+	"decision":   {},                                                  // decision log: what and why
+	"notdoing":   {},                                                  // what this project will not do
+	"break":      {},                                                  // hackathon hours off (sleep, meals)
 }
 
 func validateItem(kind string, data json.RawMessage) error {
@@ -128,7 +164,51 @@ func validateItem(kind string, data json.RawMessage) error {
 			return invalid("%s.%s must be one of: %s.", kind, field, strings.Join(allowed, ", "))
 		}
 	}
+	if kind == "break" {
+		start, okStart := parseTime(obj["start"])
+		end, okEnd := parseTime(obj["end"])
+		if !okStart || !okEnd || !end.After(start) {
+			return invalid("A break needs a start and an end, and the end must be later.")
+		}
+	}
+	if kind == "question" {
+		if v, present := obj["box_until"]; present && v != "" {
+			if _, ok := parseTime(v); !ok {
+				return invalid("The time box of a question must be a date and time.")
+			}
+		}
+	}
 	return nil
+}
+
+func parseTime(v any) (time.Time, bool) {
+	str, _ := v.(string)
+	t, err := time.Parse(time.RFC3339, str)
+	return t, err == nil
+}
+
+// stampItem fills in what the server knows better than the browser: when a decision was made
+// and how long a new open question may stay open.
+func stampItem(kind string, data json.RawMessage, p model.Project, now time.Time) json.RawMessage {
+	var obj map[string]any
+	if json.Unmarshal(data, &obj) != nil {
+		return data
+	}
+	switch kind {
+	case "decision":
+		if s, _ := obj["decided_at"].(string); s == "" {
+			obj["decided_at"] = now.UTC().Format(time.RFC3339)
+		}
+	case "question":
+		if s, _ := obj["box_until"].(string); s == "" && p.Phase == model.PhasePlan {
+			from, _ := PlanningWindow(p)
+			if from.Before(now) {
+				from = now
+			}
+			obj["box_until"] = from.Add(QuestionBox(p)).UTC().Format(time.RFC3339)
+		}
+	}
+	return mustJSON(obj)
 }
 
 func (s *Service) CreateItem(ctx context.Context, projectID int64, it model.PlanItem) (model.PlanItem, error) {
@@ -141,6 +221,13 @@ func (s *Service) CreateItem(ctx context.Context, projectID int64, it model.Plan
 	}
 	if err := validateItem(it.Kind, it.Data); err != nil {
 		return it, err
+	}
+	if it.Kind == "question" || it.Kind == "decision" {
+		p, err := s.store.GetProject(ctx, projectID)
+		if err != nil {
+			return it, err
+		}
+		it.Data = stampItem(it.Kind, it.Data, p, s.now())
 	}
 	defer s.store.Touch(ctx, projectID)
 	return s.store.CreateItem(ctx, it)
@@ -159,6 +246,7 @@ func (s *Service) UpdateItem(ctx context.Context, id int64, patch []byte) (model
 	if err := validateItem(it.Kind, it.Data); err != nil {
 		return old, err
 	}
+	defer s.store.Touch(ctx, old.ProjectID)
 	return s.store.UpdateItem(ctx, it)
 }
 
@@ -192,11 +280,44 @@ func (s *Service) UpdateMilestone(ctx context.Context, id int64, patch []byte) (
 	if !patchHas(patch, "due_at") {
 		m.DueAt = old.DueAt
 	}
-	m.ID, m.ProjectID, m.Origin, m.CreatedAt = old.ID, old.ProjectID, old.Origin, old.CreatedAt
+	m.ID, m.ProjectID, m.Origin, m.CreatedAt, m.OriginalDueAt = old.ID, old.ProjectID, old.Origin, old.CreatedAt, old.OriginalDueAt
 	if m.Title, err = cleanText(m.Title, "A milestone title", 200); err != nil {
 		return old, err
 	}
-	return s.store.UpdateMilestone(ctx, m)
+	// Once coding has started, a milestone date that was set is a promise. It can move, but
+	// each move is counted and needs its reason.
+	var move *dateMove
+	if old.DueAt != nil && (m.DueAt == nil || !m.DueAt.Equal(*old.DueAt)) {
+		p, err := s.store.GetProject(ctx, old.ProjectID)
+		if err != nil {
+			return old, err
+		}
+		if p.Phase != model.PhasePlan {
+			var body struct {
+				Reason string `json:"reason"`
+			}
+			_ = json.Unmarshal(patch, &body)
+			reason := strings.TrimSpace(body.Reason)
+			if reason == "" {
+				return old, invalid("Moving a milestone needs a reason — one line on why the date is moving.")
+			}
+			move = &dateMove{What: "milestone", ID: old.ID, Title: m.Title, From: old.DueAt.UTC().Format(time.RFC3339), Reason: reason}
+			if m.DueAt != nil {
+				move.To = m.DueAt.UTC().Format(time.RFC3339)
+			}
+		}
+	}
+	saved, err := s.store.UpdateMilestone(ctx, m)
+	if err != nil {
+		return saved, err
+	}
+	if move != nil {
+		if err := s.store.AddEvent(ctx, old.ProjectID, "date_move", s.now(), move); err != nil {
+			return saved, err
+		}
+	}
+	s.store.Touch(ctx, old.ProjectID)
+	return saved, nil
 }
 
 func (s *Service) DeleteMilestone(ctx context.Context, id int64) error {
@@ -223,6 +344,12 @@ func (s *Service) validateTask(ctx context.Context, old *model.Task, t *model.Ta
 	}
 	if len(t.Notes) > 50_000 {
 		return invalid("Those notes are too long.")
+	}
+	if t.EstimateHours != nil && (*t.EstimateHours <= 0 || *t.EstimateHours > 999) {
+		return invalid("An estimate is a number of hours above 0.")
+	}
+	if t.SpentMinutes < 0 || t.SpentMinutes > 600_000 {
+		return invalid("Time spent must be a positive number of minutes.")
 	}
 	checklist := make([]model.ChecklistItem, 0, len(t.Checklist))
 	for _, c := range t.Checklist {
@@ -274,13 +401,38 @@ func (s *Service) CreateTask(ctx context.Context, projectID int64, t model.Task)
 	if err := s.requireProject(ctx, projectID); err != nil {
 		return t, err
 	}
-	t.ProjectID, t.Origin, t.StartedAt, t.DoneAt = projectID, "", nil, nil
+	p, err := s.store.GetProject(ctx, projectID)
+	if err != nil {
+		return t, err
+	}
+	t.ProjectID, t.Origin, t.StartedAt, t.DoneAt, t.ClosedCommit = projectID, "", nil, nil, ""
 	if err := s.validateTask(ctx, nil, &t); err != nil {
 		return t, err
 	}
 	defer s.store.Touch(ctx, projectID)
 	created, _, err := s.store.CreateTask(ctx, t)
-	return created, err
+	if err != nil {
+		return created, err
+	}
+	// After coding has started, every new task is a change of scope and is counted as one —
+	// unless it is the other half of a task that was split, which adds no work.
+	split := false
+	if t.SplitFrom != nil {
+		if from, err := s.store.GetTask(ctx, *t.SplitFrom); err == nil && from.ProjectID == projectID {
+			split = true
+		}
+	}
+	created.SplitFrom = nil
+	if p.Phase == model.PhaseBuild && !split {
+		kind := "scope_add"
+		if created.Scope == "dlc" {
+			kind = "scope_park"
+		}
+		if err := s.store.AddEvent(ctx, projectID, kind, s.now(), scopeChange{TaskID: created.ID, Title: created.Title, How: "new"}); err != nil {
+			return created, err
+		}
+	}
+	return created, nil
 }
 
 func (s *Service) UpdateTask(ctx context.Context, id int64, patch []byte) (model.Task, error) {
@@ -290,9 +442,12 @@ func (s *Service) UpdateTask(ctx context.Context, id int64, patch []byte) (model
 	}
 	// Decode onto a copy whose pointers and slices are detached from old.
 	t := old
-	t.MilestoneID, t.StoryID, t.DueAt, t.Checklist = nil, nil, nil, nil
+	t.MilestoneID, t.StoryID, t.DueAt, t.Checklist, t.EstimateHours = nil, nil, nil, nil, nil
 	if err := applyPatch(patch, &t); err != nil {
 		return old, err
+	}
+	if !patchHas(patch, "estimate_hours") {
+		t.EstimateHours = old.EstimateHours
 	}
 	if !patchHas(patch, "milestone_id") {
 		t.MilestoneID = old.MilestoneID
@@ -307,15 +462,53 @@ func (s *Service) UpdateTask(ctx context.Context, id int64, patch []byte) (model
 		t.Checklist = old.Checklist
 	}
 	t.ID, t.ProjectID, t.Origin, t.CreatedAt = old.ID, old.ProjectID, old.Origin, old.CreatedAt
-	t.StartedAt, t.DoneAt = old.StartedAt, old.DoneAt
+	t.StartedAt, t.DoneAt, t.ClosedCommit = old.StartedAt, old.DoneAt, old.ClosedCommit
 	if err := s.validateTask(ctx, &old, &t); err != nil {
 		return old, err
 	}
 	defer s.store.Touch(ctx, old.ProjectID)
-	return s.store.UpdateTask(ctx, t)
+	saved, err := s.store.UpdateTask(ctx, t)
+	if err != nil {
+		return saved, err
+	}
+	if wasMVP, isMVP := old.Scope != "dlc", saved.Scope != "dlc"; wasMVP != isMVP {
+		if err := s.recordScope(ctx, saved, map[bool]string{true: "scope_add", false: "scope_park"}[isMVP], "moved"); err != nil {
+			return saved, err
+		}
+	}
+	return saved, nil
 }
 
-func (s *Service) DeleteTask(ctx context.Context, id int64) error { return s.store.DeleteTask(ctx, id) }
+// DeleteTask removes a task. Deleting unfinished MVP work after coding started counts as a cut.
+func (s *Service) DeleteTask(ctx context.Context, id int64) error {
+	t, err := s.store.GetTask(ctx, id)
+	if err != nil {
+		return err
+	}
+	if err := s.store.DeleteTask(ctx, id); err != nil {
+		return err
+	}
+	if t.Status != "done" && t.Scope != "dlc" {
+		if err := s.recordScope(ctx, t, "scope_cut", "deleted"); err != nil {
+			return err
+		}
+	}
+	s.store.Touch(ctx, t.ProjectID)
+	return nil
+}
+
+// recordScope notes a change of scope, but only once coding has started: while planning,
+// shaping the board is the whole point.
+func (s *Service) recordScope(ctx context.Context, t model.Task, kind, how string) error {
+	p, err := s.store.GetProject(ctx, t.ProjectID)
+	if err != nil {
+		return err
+	}
+	if p.Phase != model.PhaseBuild {
+		return nil
+	}
+	return s.store.AddEvent(ctx, t.ProjectID, kind, s.now(), scopeChange{TaskID: t.ID, Title: t.Title, How: how})
+}
 
 // ---------- daily log ----------
 
@@ -376,9 +569,18 @@ func (s *Service) validateObstacle(ctx context.Context, old *model.Obstacle, o *
 	switch {
 	case o.Status == "resolved" && !wasResolved:
 		now := s.now()
-		o.ResolvedAt = &now
+		o.ResolvedAt, o.TimerUntil = &now, nil
 	case o.Status == "open":
 		o.ResolvedAt = nil
+		if (old == nil || wasResolved) && !o.NeedsHelp {
+			// A fresh (or reopened) obstacle starts its first attempt window.
+			p, err := s.store.GetProject(ctx, o.ProjectID)
+			if err != nil {
+				return err
+			}
+			until := s.now().Add(StuckWindow(p))
+			o.TimerUntil = &until
+		}
 	}
 	return nil
 }
@@ -387,7 +589,7 @@ func (s *Service) CreateObstacle(ctx context.Context, projectID int64, o model.O
 	if err := s.requireProject(ctx, projectID); err != nil {
 		return o, err
 	}
-	o.ProjectID, o.ResolvedAt = projectID, nil
+	o.ProjectID, o.ResolvedAt, o.TimerUntil, o.NeedsHelp = projectID, nil, nil, false
 	if err := s.validateObstacle(ctx, nil, &o); err != nil {
 		return o, err
 	}
@@ -409,9 +611,51 @@ func (s *Service) UpdateObstacle(ctx context.Context, id int64, patch []byte) (m
 		o.TaskID = old.TaskID
 	}
 	o.ID, o.ProjectID, o.CreatedAt, o.ResolvedAt = old.ID, old.ProjectID, old.CreatedAt, old.ResolvedAt
+	o.TimerUntil, o.NeedsHelp = old.TimerUntil, old.NeedsHelp
 	if err := s.validateObstacle(ctx, &old, &o); err != nil {
 		return old, err
 	}
+	defer s.store.Touch(ctx, old.ProjectID)
+	return s.store.UpdateObstacle(ctx, o)
+}
+
+// StuckAction answers the question the stuck timer asks when an attempt window ends:
+// "retry" starts another window with a different approach (which must be written down),
+// "help" records that outside help is the plan now and stops the timer.
+func (s *Service) StuckAction(ctx context.Context, id int64, action, approach string) (model.Obstacle, error) {
+	o, err := s.store.GetObstacle(ctx, id)
+	if err != nil {
+		return o, err
+	}
+	if o.Status != "open" {
+		return o, invalid("That obstacle is already solved.")
+	}
+	switch action {
+	case "retry":
+		approach = strings.TrimSpace(approach)
+		if approach == "" {
+			return o, invalid("Write down the different approach you are going to try.")
+		}
+		if len(approach) > 2000 {
+			return o, invalid("Keep the approach short — a line or two.")
+		}
+		p, err := s.store.GetProject(ctx, o.ProjectID)
+		if err != nil {
+			return o, err
+		}
+		if strings.TrimSpace(o.Approaches) != "" {
+			o.Approaches = strings.TrimRight(o.Approaches, "\n") + "\n"
+		}
+		o.Approaches += approach
+		o.Attempts++
+		until := s.now().Add(StuckWindow(p))
+		o.TimerUntil, o.NeedsHelp = &until, false
+	case "help":
+		o.TimerUntil, o.NeedsHelp = nil, true
+	default:
+		return o, invalid("Choose to retry with another approach or to get outside help.")
+	}
+	defer s.store.Touch(ctx, o.ProjectID)
 	return s.store.UpdateObstacle(ctx, o)
 }
 

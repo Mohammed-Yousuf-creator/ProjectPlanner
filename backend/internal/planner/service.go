@@ -3,14 +3,15 @@ package planner
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 
 	"projectplanner/internal/filestore"
-	"projectplanner/internal/gitlog"
 	"projectplanner/internal/model"
 	"projectplanner/internal/store"
 )
@@ -20,10 +21,14 @@ type Service struct {
 	store *store.Store
 	files *filestore.Store
 	now   func() time.Time
+
+	// What happened the last time PLAN.md was written into each project's repository.
+	syncMu sync.Mutex
+	synced map[int64]PlanSyncState
 }
 
 func NewService(st *store.Store, files *filestore.Store) *Service {
-	return &Service{store: st, files: files, now: time.Now}
+	return &Service{store: st, files: files, now: time.Now, synced: map[int64]PlanSyncState{}}
 }
 
 // SetClock replaces the clock; tests use it to travel in time.
@@ -35,10 +40,42 @@ type Meta struct {
 	MaxPlanningDays int            `json:"max_planning_days"`
 	PlanningDays    map[string]int `json:"planning_days"`
 	MaxUploadBytes  int64          `json:"max_upload_bytes"`
+	ScopeBudget     map[string]int `json:"scope_budget"`
+	Kits            []Kit          `json:"kits"`
+	// Standard projects that are being built right now, and what the installation does about
+	// starting another one: "off", "warn" or "block".
+	Building     []string `json:"building"`
+	OneBuildMode string   `json:"one_build_mode"`
+	// The planning steps that count for each project type (optional ones are left out).
+	StepKeys map[string][]string `json:"step_keys"`
+	// How much longer finished tasks took than estimated, across all projects; 0 = unknown yet.
+	Multiplier      float64 `json:"multiplier"`
+	MultiplierTasks int     `json:"multiplier_tasks"`
+	MaxPicks        int     `json:"max_picks"`
 }
 
-func (s *Service) Meta() Meta {
-	return Meta{MaxPlanningDays: MaxPlanningDays, PlanningDays: PlanningDays, MaxUploadBytes: filestore.MaxUploadBytes}
+func (s *Service) Meta(ctx context.Context) (Meta, error) {
+	m := Meta{MaxPlanningDays: MaxPlanningDays, PlanningDays: PlanningDays, MaxUploadBytes: filestore.MaxUploadBytes,
+		ScopeBudget: scopeBudget, Kits: Kits()}
+	var err error
+	if m.Building, err = s.store.ProjectsBuilding(ctx); err != nil {
+		return m, err
+	}
+	m.OneBuildMode = s.Settings(ctx).OneBuildMode
+	m.StepKeys = map[string][]string{model.TypeStandard: {}, model.TypeHackathon: {}}
+	for _, d := range stepDefs {
+		if d.Share > 0 {
+			m.StepKeys[model.TypeStandard] = append(m.StepKeys[model.TypeStandard], d.Key)
+		}
+		if d.HackShare > 0 {
+			m.StepKeys[model.TypeHackathon] = append(m.StepKeys[model.TypeHackathon], d.Key)
+		}
+	}
+	m.MaxPicks = maxPicks
+	if m.Multiplier, m.MultiplierTasks, err = s.multiplier(ctx); err != nil {
+		return m, err
+	}
+	return m, nil
 }
 
 // ---------- projects ----------
@@ -54,6 +91,7 @@ type CreateProjectInput struct {
 	HackStart       *time.Time `json:"hack_start"`
 	HackEnd         *time.Time `json:"hack_end"`
 	TargetDate      *string    `json:"target_date"`
+	Kit             string     `json:"kit"`
 }
 
 var dateRe = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
@@ -102,6 +140,26 @@ func (s *Service) CreateProject(ctx context.Context, in CreateProjectInput) (mod
 		p.TargetDate = in.TargetDate
 	}
 
+	var kit Kit
+	if in.Kit != "" {
+		var ok bool
+		if kit, ok = kitByKey(in.Kit); !ok {
+			return p, invalid("Unknown starter kit %q.", in.Kit)
+		}
+		p.Kit = kit.Key
+	}
+	// One project in build at a time, if the installation is set to enforce it. A hackathon is
+	// an appointment, not a choice, so it is never blocked.
+	if p.Type == model.TypeStandard && s.Settings(ctx).OneBuildMode == "block" {
+		building, err := s.store.ProjectsBuilding(ctx)
+		if err != nil {
+			return p, err
+		}
+		if len(building) > 0 {
+			return p, invalid("“%s” is still being built. Ship it or archive it before starting another project — or change this rule under Settings on the projects page.", building[0])
+		}
+	}
+
 	if p.Type == model.TypeHackathon {
 		if in.HackStart == nil || in.HackEnd == nil {
 			return p, invalid("A hackathon needs a start time and a submission deadline.")
@@ -126,6 +184,7 @@ func (s *Service) CreateProject(ctx context.Context, in CreateProjectInput) (mod
 		}
 		p.PlanningDeadline = deadline
 	}
+	p.StaleHours = DefaultStaleHours(p.Type, p.HackStart, p.HackEnd)
 
 	var created model.Project
 	err := s.store.InTx(ctx, func(tx *store.Store) error {
@@ -133,7 +192,7 @@ func (s *Service) CreateProject(ctx context.Context, in CreateProjectInput) (mod
 		if created, err = tx.CreateProject(ctx, p); err != nil {
 			return err
 		}
-		for _, seed := range defaultItems(created.Type) {
+		for _, seed := range defaultItems(created, kit, now) {
 			if _, err := tx.CreateItem(ctx, model.PlanItem{ProjectID: created.ID, Kind: seed.kind, Data: mustJSON(seed.data)}); err != nil {
 				return err
 			}
@@ -150,12 +209,28 @@ type itemSeed struct {
 
 // defaultItems pre-fills the lists nobody should have to type: the usual build-vs-buy
 // questions and, for hackathons, the usual submission checklist.
-func defaultItems(projectType string) []itemSeed {
+func defaultItems(p model.Project, kit Kit, now time.Time) []itemSeed {
 	var seeds []itemSeed
-	for _, name := range []string{"Authentication", "Database", "File storage", "Hosting / deployment"} {
+	capabilities := []string{"Authentication", "Database", "File storage", "Hosting / deployment"}
+	if kit.Key != "" {
+		capabilities = kit.Capabilities
+	}
+	for _, name := range capabilities {
 		seeds = append(seeds, itemSeed{"capability", map[string]any{"name": name, "decision": "undecided", "service": "", "notes": ""}})
 	}
-	if projectType == model.TypeHackathon {
+	for _, layer := range kit.StackLayers {
+		seeds = append(seeds, itemSeed{"stack", map[string]any{"layer": layer, "choice": "", "why": "", "familiarity": ""}})
+	}
+	start, _ := PlanningWindow(p)
+	if start.Before(now) {
+		start = now
+	}
+	for _, q := range kit.Questions {
+		seeds = append(seeds, itemSeed{"question", map[string]any{
+			"text": q, "status": "open", "answer": "", "box_until": start.Add(QuestionBox(p)).UTC().Format(time.RFC3339),
+		}})
+	}
+	if p.Type == model.TypeHackathon {
 		for _, text := range []string{
 			"Read the rules and the judging criteria",
 			"Code is pushed to a public repository",
@@ -183,6 +258,12 @@ type ProjectPatch struct {
 	PlanningMinutes *int       `json:"planning_minutes"`
 	HackStart       *time.Time `json:"hack_start"`
 	HackEnd         *time.Time `json:"hack_end"`
+	ArchiveReason   *string    `json:"archive_reason"`
+	StaleHours      *int       `json:"stale_hours"`
+	PlanSync        *bool      `json:"plan_sync"`
+	CommitClose     *bool      `json:"commit_close"`
+	// Reason is required to move a ship date that was already set, once coding has started.
+	Reason string `json:"reason"`
 }
 
 func (s *Service) PatchProject(ctx context.Context, id int64, in ProjectPatch) (model.Project, error) {
@@ -216,16 +297,59 @@ func (s *Service) PatchProject(ctx context.Context, id int64, in ProjectPatch) (
 	if in.RepoPath != nil {
 		p.RepoPath = strings.TrimSpace(*in.RepoPath)
 	}
-	if in.Archived != nil {
+	if in.Archived != nil && *in.Archived != p.Archived {
 		p.Archived = *in.Archived
+		if p.Archived {
+			// Dropping an unfinished project costs one honest sentence. It is shown again when
+			// the next project is created.
+			reason := ""
+			if in.ArchiveReason != nil {
+				reason = strings.TrimSpace(*in.ArchiveReason)
+			}
+			if p.Phase != model.PhaseShipped && reason == "" {
+				return p, invalid("Say in one line why you are dropping this project. You will see it again when you start the next one.")
+			}
+			if utf8.RuneCountInString(reason) > 500 {
+				return p, invalid("Keep the reason under 500 characters.")
+			}
+			p.ArchiveReason, p.ArchivedAt = reason, &now
+		} else {
+			p.ArchiveReason, p.ArchivedAt = "", nil
+		}
 	}
+	if in.StaleHours != nil {
+		if *in.StaleHours < 1 || *in.StaleHours > 720 {
+			return p, invalid("The limit for a task in progress must be between 1 hour and 30 days.")
+		}
+		p.StaleHours = *in.StaleHours
+	}
+	if in.PlanSync != nil {
+		p.PlanSync = *in.PlanSync
+	}
+	if in.CommitClose != nil {
+		p.CommitClose = *in.CommitClose
+	}
+	var move *dateMove
 	if in.TargetDate != nil {
+		old := ""
+		if p.TargetDate != nil {
+			old = *p.TargetDate
+		}
 		if *in.TargetDate == "" {
 			p.TargetDate = nil
 		} else if !validDate(*in.TargetDate) {
 			return p, invalid("The target date must look like 2026-12-31.")
 		} else {
 			p.TargetDate = in.TargetDate
+		}
+		// Once coding has started, a ship date that was set is a promise: it can move, but the
+		// move is written down with its reason.
+		if p.Phase != model.PhasePlan && old != "" && *in.TargetDate != old {
+			reason := strings.TrimSpace(in.Reason)
+			if reason == "" {
+				return p, invalid("Moving the ship date needs a reason — one line on why it is moving.")
+			}
+			move = &dateMove{What: "target", Title: "Ship date", From: old, To: *in.TargetDate, Reason: reason}
 		}
 	}
 
@@ -269,7 +393,19 @@ func (s *Service) PatchProject(ctx context.Context, id int64, in ProjectPatch) (
 		p.PlanningDeadline = HackathonDeadline(*p.HackStart, *p.HackEnd, budget)
 	}
 
-	return s.store.UpdateProject(ctx, p)
+	saved, err := s.store.UpdateProject(ctx, p)
+	if err != nil {
+		return saved, err
+	}
+	if move != nil {
+		if err := s.store.AddEvent(ctx, id, "date_move", now, move); err != nil {
+			return saved, err
+		}
+	}
+	if in.PlanSync != nil || in.RepoPath != nil {
+		s.syncPlan(ctx, saved)
+	}
+	return saved, nil
 }
 
 func (s *Service) DeleteProject(ctx context.Context, id int64) error {
@@ -327,6 +463,23 @@ type Bundle struct {
 	Logs       []model.DailyLog   `json:"logs"`
 	Obstacles  []model.Obstacle   `json:"obstacles"`
 	Files      []model.File       `json:"files"`
+	Events     []model.Event      `json:"events"`
+	Picks      []model.DayPick    `json:"picks"`
+	Limits     Limits             `json:"limits"`
+	PlanSync   *PlanSyncState     `json:"plan_sync"`
+	// Milestones that slipped with open work, and what the cut order says to drop next.
+	Slips   []Slip        `json:"slips"`
+	CutNext *CutCandidate `json:"cut_next"`
+	// Whether a frozen copy of the plan exists, and the retrospective once the project shipped.
+	HasSnapshot bool   `json:"has_snapshot"`
+	Retro       *Retro `json:"retro"`
+}
+
+// Limits are the numbers the honesty rules work with for this project.
+type Limits struct {
+	ScopeBudget  int `json:"scope_budget"`  // most user stories the MVP may hold
+	StuckMinutes int `json:"stuck_minutes"` // length of one attempt at an obstacle
+	CutSnoozeMin int `json:"cut_snooze_minutes"`
 }
 
 func (s *Service) Bundle(ctx context.Context, id int64) (*Bundle, error) {
@@ -368,8 +521,45 @@ func (s *Service) Bundle(ctx context.Context, id int64) (*Bundle, error) {
 		return nil, err
 	}
 
+	if b.Events, err = s.store.ListEvents(ctx, id); err != nil {
+		return nil, err
+	}
+	if b.Picks, err = s.store.ListPicks(ctx, id); err != nil {
+		return nil, err
+	}
+
 	b.Steps = ComputeSteps(p, planData{b.Stories, b.Items, b.Milestones, b.Tasks, b.Files})
 	b.Planning = planningState(p, b.Steps, now)
+	b.Limits = Limits{ScopeBudget: ScopeBudget(p), StuckMinutes: int(StuckWindow(p) / time.Minute), CutSnoozeMin: int(CutSnooze(p) / time.Minute)}
+	if b.Hackathon != nil {
+		b.Hackathon.applyBreaks(b.Items)
+	}
+	if p.PlanSync {
+		st := s.planSyncState(id)
+		b.PlanSync = &st
+	}
+	b.Slips, b.CutNext = slips(b), nextCut(b)
+	if p.Phase != model.PhasePlan {
+		sn, err := s.store.GetSnapshot(ctx, id)
+		switch {
+		case errors.Is(err, store.ErrNotFound):
+		case err != nil:
+			return nil, err
+		default:
+			b.HasSnapshot = true
+			if p.Phase == model.PhaseShipped {
+				changes := 0
+				var old planSnapshot
+				if json.Unmarshal(sn.Data, &old) == nil {
+					changes = len(diffPlan(old, takeSnapshot(p, b.Stories, b.Items, b.Milestones)))
+				}
+				b.Retro = buildRetro(b, changes)
+			}
+		}
+		if b.Retro == nil && p.Phase == model.PhaseShipped {
+			b.Retro = buildRetro(b, 0)
+		}
+	}
 	return b, nil
 }
 
@@ -430,16 +620,6 @@ func (s *Service) SetStep(ctx context.Context, id int64, key, status string) err
 		return invalid("A step is todo, done or skipped.")
 	}
 	return s.store.SetStep(ctx, id, key, status)
-}
-
-// ---------- git ----------
-
-func (s *Service) Git(ctx context.Context, id int64) (gitlog.Info, error) {
-	p, err := s.store.GetProject(ctx, id)
-	if err != nil {
-		return gitlog.Info{}, err
-	}
-	return gitlog.Read(ctx, p.RepoPath, 300), nil
 }
 
 // ---------- helpers ----------

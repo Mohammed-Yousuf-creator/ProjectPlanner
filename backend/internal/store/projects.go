@@ -12,18 +12,21 @@ import (
 const projectCols = `p.id, p.name, p.summary, p.type, p.complexity, p.vendor_mode, p.phase, p.archived,
 	p.decided_at, p.planning_deadline, p.build_started_at, p.forced_start, p.shipped_at,
 	to_char(p.target_date, 'YYYY-MM-DD'), p.hack_start, p.hack_end, p.repo_path, p.plan, p.steps,
-	p.created_at, p.updated_at`
+	p.created_at, p.updated_at, p.kit, p.archive_reason, p.archived_at, p.build_ack_at,
+	to_char(p.original_target_date, 'YYYY-MM-DD'), p.stale_hours, p.plan_sync, p.commit_close`
 
 func scanProject(row scanner, extra ...any) (model.Project, error) {
 	var (
 		p                             model.Project
 		buildStarted, shipped, hs, he sql.NullTime
-		target                        sql.NullString
+		archivedAt, ackAt             sql.NullTime
+		target, originalTarget        sql.NullString
 		plan, steps                   []byte
 	)
 	dest := []any{&p.ID, &p.Name, &p.Summary, &p.Type, &p.Complexity, &p.VendorMode, &p.Phase, &p.Archived,
 		&p.DecidedAt, &p.PlanningDeadline, &buildStarted, &p.ForcedStart, &shipped,
-		&target, &hs, &he, &p.RepoPath, &plan, &steps, &p.CreatedAt, &p.UpdatedAt}
+		&target, &hs, &he, &p.RepoPath, &plan, &steps, &p.CreatedAt, &p.UpdatedAt,
+		&p.Kit, &p.ArchiveReason, &archivedAt, &ackAt, &originalTarget, &p.StaleHours, &p.PlanSync, &p.CommitClose}
 	if err := row.Scan(append(dest, extra...)...); err != nil {
 		return p, notFound(err)
 	}
@@ -31,8 +34,13 @@ func scanProject(row scanner, extra ...any) (model.Project, error) {
 	p.ShippedAt = timePtr(shipped)
 	p.HackStart = timePtr(hs)
 	p.HackEnd = timePtr(he)
+	p.ArchivedAt = timePtr(archivedAt)
+	p.BuildAckAt = timePtr(ackAt)
 	if target.Valid {
 		p.TargetDate = &target.String
+	}
+	if originalTarget.Valid {
+		p.OriginalTargetDate = &originalTarget.String
 	}
 	p.Plan = map[string]string{}
 	p.Steps = map[string]string{}
@@ -51,11 +59,12 @@ func timePtr(t sql.NullTime) *time.Time {
 func (s *Store) CreateProject(ctx context.Context, p model.Project) (model.Project, error) {
 	row := s.q.QueryRowContext(ctx, `
 		INSERT INTO projects AS p (name, summary, type, complexity, vendor_mode, decided_at,
-			planning_deadline, target_date, hack_start, hack_end, repo_path)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8::date, $9, $10, $11)
+			planning_deadline, target_date, original_target_date, hack_start, hack_end, repo_path,
+			kit, stale_hours)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8::date, $8::date, $9, $10, $11, $12, $13)
 		RETURNING `+projectCols,
 		p.Name, p.Summary, p.Type, p.Complexity, p.VendorMode, p.DecidedAt,
-		p.PlanningDeadline, p.TargetDate, p.HackStart, p.HackEnd, p.RepoPath)
+		p.PlanningDeadline, p.TargetDate, p.HackStart, p.HackEnd, p.RepoPath, p.Kit, p.StaleHours)
 	return scanProject(row)
 }
 
@@ -105,11 +114,15 @@ func (s *Store) UpdateProject(ctx context.Context, p model.Project) (model.Proje
 	row := s.q.QueryRowContext(ctx, `
 		UPDATE projects AS p SET name = $2, summary = $3, complexity = $4, vendor_mode = $5,
 			archived = $6, planning_deadline = $7, target_date = $8::date, hack_start = $9,
-			hack_end = $10, repo_path = $11, updated_at = now()
+			hack_end = $10, repo_path = $11, archive_reason = $12, archived_at = $13,
+			original_target_date = CASE WHEN p.phase = 'plan' THEN $8::date
+				ELSE COALESCE(p.original_target_date, $8::date) END,
+			stale_hours = $14, plan_sync = $15, commit_close = $16, updated_at = now()
 		WHERE p.id = $1
 		RETURNING `+projectCols,
 		p.ID, p.Name, p.Summary, p.Complexity, p.VendorMode, p.Archived, p.PlanningDeadline,
-		p.TargetDate, p.HackStart, p.HackEnd, p.RepoPath)
+		p.TargetDate, p.HackStart, p.HackEnd, p.RepoPath, p.ArchiveReason, p.ArchivedAt,
+		p.StaleHours, p.PlanSync, p.CommitClose)
 	return scanProject(row)
 }
 
@@ -174,4 +187,52 @@ func (s *Store) ProjectsPastPlanningDeadline(ctx context.Context, now time.Time)
 
 func (s *Store) Touch(ctx context.Context, id int64) {
 	_, _ = s.q.ExecContext(ctx, `UPDATE projects SET updated_at = now() WHERE id = $1`, id)
+}
+
+// AckBuild records that the user has seen the "pencils down" screen.
+func (s *Store) AckBuild(ctx context.Context, id int64, at time.Time) error {
+	return affected(s.q.ExecContext(ctx,
+		`UPDATE projects SET build_ack_at = COALESCE(build_ack_at, $2) WHERE id = $1`, id, at))
+}
+
+// ProjectsBuilding lists the names of unarchived standard projects that are being built.
+func (s *Store) ProjectsBuilding(ctx context.Context) ([]string, error) {
+	rows, err := s.q.QueryContext(ctx, `
+		SELECT name FROM projects
+		WHERE phase = 'build' AND NOT archived AND type = 'standard' ORDER BY build_started_at`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	names := []string{}
+	for rows.Next() {
+		var n string
+		if err := rows.Scan(&n); err != nil {
+			return nil, err
+		}
+		names = append(names, n)
+	}
+	return names, rows.Err()
+}
+
+// ProjectIDs lists every project that is not archived, most recently touched first.
+func (s *Store) ProjectIDs(ctx context.Context, where string) ([]int64, error) {
+	q := `SELECT id FROM projects WHERE NOT archived`
+	if where != "" {
+		q += ` AND ` + where
+	}
+	rows, err := s.q.QueryContext(ctx, q+` ORDER BY updated_at DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var ids []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
 }

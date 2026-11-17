@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -16,6 +17,31 @@ type Commit struct {
 	Hash    string    `json:"hash"`
 	Subject string    `json:"subject"`
 	At      time.Time `json:"at"`
+	// Task numbers the message mentions ("#12"), and the ones it says are finished
+	// ("closes #12", "fixes #12", "done #12").
+	Refs   []int64 `json:"refs"`
+	Closes []int64 `json:"closes"`
+}
+
+var (
+	refRe   = regexp.MustCompile(`(?:^|[^\w&#])#(\d{1,12})\b`)
+	closeRe = regexp.MustCompile(`(?i)\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?|done|finish(?:e[sd])?)\s*:?\s+#(\d{1,12})\b`)
+)
+
+// ParseRefs finds the task numbers a commit message mentions and the ones it closes.
+func ParseRefs(message string) (refs, closes []int64) {
+	collect := func(re *regexp.Regexp) []int64 {
+		out := []int64{}
+		seen := map[int64]bool{}
+		for _, m := range re.FindAllStringSubmatch(message, -1) {
+			if n, err := strconv.ParseInt(m[1], 10, 64); err == nil && n > 0 && !seen[n] {
+				seen[n] = true
+				out = append(out, n)
+			}
+		}
+		return out
+	}
+	return collect(refRe), collect(closeRe)
 }
 
 type Info struct {
@@ -81,21 +107,24 @@ func Read(ctx context.Context, path string, limit int) Info {
 			}
 		}
 	}
-	// %x1f (unit separator) cannot appear in a subject line, so it is a safe field delimiter.
-	out, err := git(ctx, dir, "log", "-n", strconv.Itoa(limit), "--pretty=format:%H%x1f%aI%x1f%s")
+	// %x1f (unit separator) and %x1e (record separator) cannot appear in a commit message, so
+	// they are safe delimiters even though the body spans several lines.
+	out, err := git(ctx, dir, "log", "-n", strconv.Itoa(limit), "--pretty=format:%H%x1f%aI%x1f%s%x1f%b%x1e")
 	if err != nil {
 		return info // a repository without commits yet
 	}
-	for _, line := range strings.Split(out, "\n") {
-		parts := strings.SplitN(line, "\x1f", 3)
-		if len(parts) != 3 {
+	for _, record := range strings.Split(out, "\x1e") {
+		parts := strings.SplitN(strings.TrimLeft(record, "\n"), "\x1f", 4)
+		if len(parts) != 4 {
 			continue
 		}
 		at, err := time.Parse(time.RFC3339, parts[1])
 		if err != nil {
 			continue
 		}
-		info.Commits = append(info.Commits, Commit{Hash: parts[0], Subject: parts[2], At: at})
+		c := Commit{Hash: parts[0], Subject: parts[2], At: at}
+		c.Refs, c.Closes = ParseRefs(parts[2] + "\n" + parts[3])
+		info.Commits = append(info.Commits, c)
 	}
 	return info
 }

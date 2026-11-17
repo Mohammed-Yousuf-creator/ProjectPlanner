@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api';
+import { ReasonModal } from '../components/Honesty';
 import { AddInput, Badge, Empty, Field, Icon, SavedDate, SavedText, Segmented } from '../components/ui';
 import { useProject, useToast } from '../store';
 import type { CapabilityData, FlowData, Milestone, StackData, VendorMode } from '../types';
@@ -225,16 +226,35 @@ export function BuildPlanStep() {
 }
 
 export function MilestoneRow({ m, count, precise }: { m: Milestone; count: number; precise: boolean }) {
-  const { run } = useProject();
+  const { p, run } = useProject();
+  const [pending, setPending] = useState<{ due: string | null } | null>(null);
+  const [version, setVersion] = useState(0);
   const setDue = (value: string) => {
     const due = !value ? null : precise ? fromLocalInput(value) : endOfDayISO(value);
-    void run(() => api.patch('milestones', m.id, { due_at: due }));
+    if (due === m.due_at || (due && m.due_at && new Date(due).getTime() === new Date(m.due_at).getTime())) return;
+    // Once coding has started, a deadline that was set is a promise: moving it needs a reason.
+    if (p.phase !== 'plan' && m.due_at) setPending({ due });
+    else void run(() => api.patch('milestones', m.id, { due_at: due }));
   };
+  const moved = m.original_due_at && m.due_at && new Date(m.original_due_at).getTime() !== new Date(m.due_at).getTime();
   return (
-    <li className="row row-wrap">
+    <li className="row row-wrap" key={version}>
+      {pending && (
+        <ReasonModal title={pending.due ? `Move “${m.title}” to ${fmtDateTime(pending.due)}` : `Remove the deadline of “${m.title}”`}
+          confirmLabel={pending.due ? 'Move the date' : 'Remove the deadline'} placeholder="e.g. The parser took two days longer"
+          onClose={() => { setPending(null); setVersion((v) => v + 1); }}
+          onConfirm={async (reason) => {
+            await run(() => api.patch('milestones', m.id, { due_at: pending.due, reason }));
+            setPending(null);
+            setVersion((v) => v + 1);
+          }}>
+          <p className="muted">It was due {fmtDateTime(m.due_at!)}. The move is counted and shown on the overview with the reason you give.</p>
+        </ReasonModal>
+      )}
       <SavedText className="row-main" value={m.title} ariaLabel="Milestone"
         required onSave={(v) => { void run(() => api.patch('milestones', m.id, { title: v })); }} />
       <Badge>{count} task{count === 1 ? '' : 's'}</Badge>
+      {moved && <Badge tone="danger" title={`First planned for ${fmtDateTime(m.original_due_at!)}`}>moved</Badge>}
       <SavedDate ariaLabel="Deadline" title={m.due_at ? fmtDateTime(m.due_at) : 'No deadline'}
         type={precise ? 'datetime-local' : 'date'}
         value={m.due_at ? (precise ? toLocalInput(m.due_at) : dayKey(m.due_at)) : ''}

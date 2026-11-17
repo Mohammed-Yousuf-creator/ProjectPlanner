@@ -19,7 +19,12 @@ func (s *Server) health(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) meta(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, s.svc.Meta())
+	meta, err := s.svc.Meta(r.Context())
+	if err != nil {
+		fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, meta)
 }
 
 // ---------- projects ----------

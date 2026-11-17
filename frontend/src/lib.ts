@@ -1,7 +1,7 @@
 // Derived state: what the clock should say, how far along the project is.
 
-import type { Bundle, Milestone, Segment, Task } from './types';
-import { DAY, dayKey, fromDayKey, roughly, streak } from './time';
+import type { Bundle, DateMove, Milestone, Segment, Story, Task } from './types';
+import { DAY, HOUR, dayKey, fromDayKey, roughly, streak } from './time';
 
 export type Tone = 'calm' | 'warn' | 'hot' | 'ok';
 
@@ -117,4 +117,166 @@ export function expectedProgress(b: Bundle, now: number): number | null {
   if (now <= start) return 0;
   if (now >= end) return 1;
   return (now - start) / (end - start);
+}
+
+// ---------- keeping scope and time honest ----------
+
+/** How many tasks were added to, parked from and cut out of the MVP since coding started. */
+export function scopeCreep(b: Bundle): { added: number; ideas: number; removed: number; net: number } {
+  let added = 0, ideas = 0, removed = 0;
+  for (const e of b.events) {
+    if (e.kind === 'scope_add') added++;
+    else if (e.kind === 'scope_park') {
+      // A new idea parked straight away never touched the MVP; a task moved out of it did.
+      if (e.data.how === 'new') ideas++;
+      else removed++;
+    } else if (e.kind === 'scope_cut') removed += Math.max(1, e.data.tasks?.length ?? 1);
+  }
+  return { added, ideas, removed, net: added - removed };
+}
+
+/** "1.5/2 h" (spent of estimated), "2 h" (estimate only) or "40 min" (spent only); empty when neither is set. */
+export function effortLabel(t: Task): string {
+  const spent = t.spent_minutes > 0 ? Math.round(t.spent_minutes / 6) / 10 : 0;
+  if (t.estimate_hours && spent > 0) return `${spent}/${t.estimate_hours} h`;
+  if (t.estimate_hours) return `${t.estimate_hours} h`;
+  return t.spent_minutes > 0 ? hoursLabel(t.spent_minutes) : '';
+}
+
+/** Every time a deadline was moved after coding started, newest first. */
+export function dateMoves(b: Bundle): { at: string; move: DateMove }[] {
+  const out: { at: string; move: DateMove }[] = [];
+  for (const e of b.events) if (e.kind === 'date_move') out.push({ at: e.at, move: e.data });
+  return out.reverse();
+}
+
+/** Days between the first ship date and the current one; positive = later than first planned. */
+export function targetDrift(b: Bundle): number | null {
+  const { target_date: now, original_target_date: first } = b.project;
+  if (!now || !first) return null;
+  return Math.round((fromDayKey(now).getTime() - fromDayKey(first).getTime()) / DAY);
+}
+
+/** How long a task may sit in progress before it is flagged: the project limit, or twice its estimate if that is longer. */
+export function staleLimitMs(t: Task, staleHours: number): number {
+  const byEstimate = t.estimate_hours ? t.estimate_hours * 2 * HOUR : 0;
+  return Math.max(staleHours * HOUR, byEstimate);
+}
+
+export function isStale(t: Task, staleHours: number, now: number): boolean {
+  return t.status === 'doing' && !!t.started_at && now - ms(t.started_at) > staleLimitMs(t, staleHours);
+}
+
+export const staleTasks = (b: Bundle, now: number) => b.tasks.filter((t) => isStale(t, b.project.stale_hours, now));
+
+export interface EstimateStats {
+  /** Finished tasks that have both an estimate and logged time. */
+  measured: number;
+  estimated: number; // hours, over the measured tasks
+  spent: number;     // hours, over the measured tasks
+  multiplier: number | null;
+  /** Open MVP work: estimated hours left, and how many open tasks have no estimate. */
+  openHours: number;
+  openUnestimated: number;
+}
+
+export function estimateStats(tasks: Task[]): EstimateStats {
+  const s: EstimateStats = { measured: 0, estimated: 0, spent: 0, multiplier: null, openHours: 0, openUnestimated: 0 };
+  for (const t of mvpTasks(tasks)) {
+    if (t.status === 'done') {
+      if (t.estimate_hours && t.spent_minutes > 0) {
+        s.measured++;
+        s.estimated += t.estimate_hours;
+        s.spent += t.spent_minutes / 60;
+      }
+    } else if (t.estimate_hours) {
+      s.openHours += t.estimate_hours;
+    } else {
+      s.openUnestimated++;
+    }
+  }
+  if (s.estimated > 0) s.multiplier = s.spent / s.estimated;
+  return s;
+}
+
+export interface Pace {
+  start: number;
+  end: number | null;              // the ship date (end of that day), if one is set
+  /** Remaining MVP tasks over time: one point per change, ending at "now". */
+  points: { at: number; remaining: number }[];
+  total: number;
+  remaining: number;
+  /** Tasks finished per day over the last week of building (or since the start, if shorter). */
+  perDay: number;
+  /** When the remaining work reaches zero at that pace; null when nothing was finished yet. */
+  projected: number | null;
+  /** Projected finish minus ship date, in days; positive = late. */
+  slipDays: number | null;
+}
+
+/**
+ * Burn-down of the MVP: how many tasks were open at each moment since coding started, and when
+ * they run out at the pace of the last seven days. Tasks added later raise the line — scope
+ * creep is visible as a step up.
+ */
+export function pace(b: Bundle, now: number): Pace | null {
+  const p = b.project;
+  if (!p.build_started_at) return null;
+  const start = ms(p.build_started_at);
+  const stop = p.shipped_at ? ms(p.shipped_at) : now;
+  const list = mvpTasks(b.tasks);
+  const changes: { at: number; delta: number }[] = [];
+  let open = 0;
+  for (const t of list) {
+    const created = ms(t.created_at);
+    if (created <= start) open++;
+    else changes.push({ at: Math.min(created, stop), delta: 1 });
+    if (t.status === 'done' && t.done_at) changes.push({ at: Math.min(Math.max(ms(t.done_at), start), stop), delta: -1 });
+  }
+  changes.sort((a, c) => a.at - c.at);
+  const points = [{ at: start, remaining: open }];
+  for (const c of changes) {
+    open += c.delta;
+    points.push({ at: c.at, remaining: Math.max(0, open) });
+  }
+  points.push({ at: stop, remaining: Math.max(0, open) });
+
+  const remaining = list.filter((t) => t.status !== 'done').length;
+  const windowStart = Math.max(start, stop - 7 * DAY);
+  const doneInWindow = list.filter((t) => t.status === 'done' && t.done_at && ms(t.done_at) >= windowStart).length;
+  const windowDays = Math.max((stop - windowStart) / DAY, 0.25);
+  const perDay = doneInWindow / windowDays;
+  let end: number | null = null;
+  if (b.hackathon) end = ms(b.hackathon.freeze_at);
+  else if (p.target_date) {
+    const d = fromDayKey(p.target_date);
+    d.setHours(23, 59, 0, 0);
+    end = d.getTime();
+  }
+  const projected = remaining === 0 ? stop : perDay > 0 ? stop + (remaining / perDay) * DAY : null;
+  const slipDays = projected !== null && end !== null ? (projected - end) / DAY : null;
+  return { start, end, points, total: list.length, remaining, perDay, projected, slipDays };
+}
+
+/** The picks made for a day, in order. */
+export const picksFor = (b: Bundle, day: string) => b.picks.filter((k) => k.day === day).sort((a, c) => a.position - c.position);
+
+/** MVP stories in the order they get cut: ranked first, then unranked from the bottom up. */
+export function cutOrder(stories: Story[]): Story[] {
+  return stories.filter((s) => s.tier === 'mvp').sort((a, c) => {
+    if (a.cut_rank !== null && c.cut_rank !== null) return a.cut_rank - c.cut_rank;
+    if (a.cut_rank !== null) return -1;
+    if (c.cut_rank !== null) return 1;
+    return c.position - a.position;
+  });
+}
+
+/** "1.4×" */
+export const times = (n: number) => `${n.toFixed(n >= 10 ? 0 : 1)}×`;
+
+/** Hours as "1.5 h", minutes below an hour as "40 min". */
+export function hoursLabel(minutes: number): string {
+  if (minutes < 60) return `${Math.round(minutes)} min`;
+  const h = minutes / 60;
+  return `${Number.isInteger(h) ? h : h.toFixed(1)} h`;
 }

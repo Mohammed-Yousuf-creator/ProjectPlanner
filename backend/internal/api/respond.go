@@ -7,6 +7,7 @@ import (
 	"log"
 	"mime"
 	"net/http"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -88,4 +89,14 @@ func pathID(r *http.Request, name string) (int64, error) {
 		return 0, store.ErrNotFound
 	}
 	return id, nil
+}
+
+func itoa(n int64) string { return strconv.FormatInt(n, 10) }
+
+// absPath shows a folder the way the user would type it.
+func absPath(p string) string {
+	if abs, err := filepath.Abs(p); err == nil {
+		return abs
+	}
+	return p
 }

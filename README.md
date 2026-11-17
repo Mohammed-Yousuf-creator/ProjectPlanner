@@ -7,8 +7,10 @@ decide to do a project, you are coding**, whether the plan is finished or not.
 - Go server, PostgreSQL database, React interface
 - Everything stays on your machine: no accounts, no cloud, no AI features
 - Standard projects and hackathon projects (with a countdown clock)
+- While you build, it keeps count of what the plan promised: scope added, dates moved,
+  estimates against the hours they really took
 
-![Project overview during planning](docs/overview.png)
+![Project overview while building](docs/overview.png)
 
 ## Contents
 
@@ -18,6 +20,8 @@ decide to do a project, you are coding**, whether the plan is finished or not.
 - [Where your data lives](#where-your-data-lives)
 - [Settings](#settings)
 - [How the planner works](#how-the-planner-works)
+- [Backups, export and import](#backups-export-and-import)
+- [From the terminal](#from-the-terminal)
 - [Troubleshooting](#troubleshooting)
 - [Development](#development)
 
@@ -111,7 +115,8 @@ page says so and shows these commands.
 | Command | What it does |
 | --- | --- |
 | `make run` | Start the planner at http://localhost:8080 |
-| `make backup` | Save the database and uploads to `backups/` |
+| `make backup` | Save the database and uploads to `backups/` (the planner also does this once a day) |
+| `bin/planner status` | Print where the current project stands, see [From the terminal](#from-the-terminal) |
 | `make db` | Start PostgreSQL and make sure the database exists |
 | `make build` | Rebuild after pulling changes |
 | `make dev` | Development mode with hot reload |
@@ -156,16 +161,7 @@ a deadline passes, the switch happens the moment it starts again.
 | Settings | `.env` in this folder |
 | Backups | `backups/` in this folder |
 
-`make backup` writes one `backups/planner-<date>.tar.gz` with a database dump and the
-uploads. To restore one (this replaces the current data):
-
-```bash
-mkdir -p /tmp/restore && tar -xzf backups/planner-<date>.tar.gz -C /tmp/restore
-sudo -u postgres dropdb planner        # stop the planner first
-make db                                # recreates an empty database
-psql "postgres://planner:planner@127.0.0.1:5432/planner" < /tmp/restore/planner.sql
-rm -rf data/uploads && cp -r /tmp/restore/uploads data/uploads
-```
+Backups are covered in [Backups, export and import](#backups-export-and-import).
 
 To remove everything: `sudo -u postgres dropdb planner`, then delete this folder.
 
@@ -179,9 +175,15 @@ All optional. Put them in `.env`, or set them in the environment.
 | `PLANNER_ADDR` | `127.0.0.1:8080` | Address the server listens on |
 | `PLANNER_DATA_DIR` | `data` | Where uploads are stored |
 | `PLANNER_STATIC_DIR` | `frontend/dist` | Built interface to serve |
+| `PLANNER_BACKUP_DIR` | `backups`, next to the data folder | Where backups are written |
+| `PLANNER_DATABASE_URL` | not set | Only for `planner status`: the database to read when it is not the one in `.env` |
 
 The default address is reachable only from this computer. There is no login, so only change
 it to `0.0.0.0:8080` on a network you trust.
+
+Settings you change while using the planner are on the gear icon in the top bar: the
+one-project rule and automatic backups. Per-project settings (ship date, the limit for a task
+in progress, the repository) are on the project's Settings tab.
 
 ## How the planner works
 
@@ -223,9 +225,11 @@ as illustrations only.
 
 After planning:
 
-- **Board.** Backlog, to do, doing, done. Tasks have sub-steps and hard deadlines and are
-  grouped into milestones. Once coding has started, a new idea can be added to the MVP or
-  parked for later with one click.
+- **Board.** Backlog, to do, doing, done. Tasks have sub-steps, an estimate and hard
+  deadlines, and are grouped into milestones. Once coding has started, a new idea can be
+  added to the MVP or parked for later with one click.
+- **Focus.** One task, its sub-steps and a timer, with nothing else on the page. The time
+  is added to the task.
 - **Journal.** One entry per day, like a commit message for the day, with a streak. Link the
   project's local git folder and its commits show up and count too. The planner only reads
   from the repository.
@@ -236,6 +240,94 @@ After planning:
 - **Expansion pack.** Stories marked "later" wait here and unlock when the MVP ships.
 - **Files.** Everything for the project in one place.
 - **Export.** The whole blueprint as one `PLAN.md` to keep next to the code.
+
+### Keeping the plan small
+
+These are part of the planning steps.
+
+- **Scope budget.** The MVP holds a fixed number of user stories by project size: tiny 3,
+  small 5, medium 8, hard 12. A hackathon gets 2 to 6, by the length of the event. To add
+  one more, move another out first.
+- **Cut order.** In the MVP step you rank the MVP stories by what goes first when time runs
+  short. You decide this while you are calm, so there is nothing to argue about later.
+- **Not doing.** A list of things the project leaves out on purpose, each with a reason.
+- **Decisions.** Each step has a short log: what you decided, why, and what you turned
+  down. They are included in `PLAN.md`.
+- **Time-boxed questions.** An open feasibility question gets a tenth of the planning
+  window (15 minutes to a day). After that you answer it or mark it "learn while building",
+  which turns it into a task.
+- **Starter kits.** Optional when you create a project: command-line tool, web app, API,
+  library or game. A kit fills in stack layers, capabilities, the usual open questions and
+  a first set of milestones. Everything it adds can be edited or deleted.
+- **One project at a time.** Starting a project while another is still being built gives a
+  warning that names the unfinished one. You can switch this off or make it a refusal in
+  the app settings. Hackathons are exempt.
+- **Notes from past projects.** The new-project dialog shows what you wrote in earlier
+  retrospectives and why you archived earlier projects.
+
+### When planning time is up
+
+The first time you open a project after its planning deadline, you get one screen: how many
+tasks are on the board, which decisions are left to make while building, and your first
+task. The plan as it stood is kept as a frozen copy. Later edits to the blueprint are
+allowed, and the overview lists them against that copy.
+
+### Keeping the build honest
+
+![Board with a slipped milestone and the cut prompt](docs/board.png)
+
+All of this is on the project overview, and the first two also show on the board.
+
+- **A milestone slips.** When a milestone is overdue with tasks still open, the planner
+  shows the next story on your cut list with two choices: cut it (its open tasks move to
+  the expansion pack) or move the date.
+- **Moving a date needs a reason.** Once coding has started, changing the ship date or a
+  milestone date asks for one line saying why. The overview keeps the count and the list.
+- **A task sits in progress too long.** After two days (a setting per project; a twelfth of
+  the event in a hackathon) it is flagged "split it or cut it". Splitting a task does not
+  count as added scope.
+- **Scope since coding started.** Tasks added to the MVP, tasks cut, ideas parked.
+- **Pace.** Open tasks over time, with the date you reach zero at the speed of the last
+  seven days, next to the ship date.
+- **Estimates against actuals.** Hours spent against hours estimated on finished tasks, as
+  one ratio, applied to the work that is left. The dashboard shows the ratio across all
+  projects.
+- **Today's three.** Pick up to three tasks for the day.
+- **Stuck timer.** An attempt at an obstacle lasts 20 minutes (10 in a hackathon). When it
+  runs out the planner asks for a different approach or for outside help. For a
+  problem-solving obstacle, outside help unlocks after two attempts and your own approaches
+  written down.
+
+### Finishing
+
+- **Shipping** opens a retrospective: planned against actual for planning time, ship date,
+  scope and estimates, per milestone, plus where you got stuck. You add three lines: what
+  went well, what was harder than expected, what you will do differently.
+- **Archiving** an unfinished project asks why you are stopping.
+- Both show up in the new-project dialog next time.
+
+### Linking the code repository
+
+Set the project's local git folder on its Settings tab. The planner reads the commit log and
+nothing else, with two optional additions:
+
+- **Keep `PLAN.md` up to date.** The planner writes the blueprint to `PLAN.md` in that
+  folder when the plan changes. It writes that one file and never commits.
+- **Commits close tasks.** `closes #12` in a commit message marks task 12 done (`fixes`,
+  `resolves`, `done` and `finishes` work too). `#12` alone links the commit to the task.
+
+### Search, reminders and the calendar
+
+- **Search** (the magnifier, or press `/` or Ctrl+K) covers projects, tasks, blueprint
+  text, decisions, obstacles and journal entries in every project.
+- **Reminders** (the bell) are browser notifications for the planning deadline, the ship
+  date, milestones, the stuck timer, tasks in progress too long, and the freeze and submit
+  times of a hackathon. They are off until you switch them on, and they only arrive while
+  the planner is open in a browser tab.
+- **Calendar.** Each project has a calendar file with its deadlines and milestones
+  (Settings tab, "Calendar (.ics)"). A calendar app on the same computer can subscribe to
+  its address and follow the dates as they move.
+- The dashboard shows the last year of logged days across all projects.
 
 ### Building it yourself or using external services
 
@@ -261,6 +353,10 @@ deadline.
   demo script, and a "cut in this order" list for when time runs short.
 - A warning when the share of finished tasks falls well behind the share of build time used.
 - If the organisers move the times, change them on the Hackathon tab.
+- **Sleep and breaks.** Block off the time you will not be working. The page shows the real
+  build time that is left after them.
+- **Pitch rehearsal.** A timer against the time limit of the pitch, with the result of
+  each run.
 
 ### Uploads
 
@@ -270,6 +366,71 @@ refuses larger files before uploading. Files are compressed with
 open-source Go library [klauspost/compress](https://github.com/klauspost/compress). A file
 that does not get smaller (most photos, archives) is stored as it is. Downloads give back
 the original bytes.
+
+## Backups, export and import
+
+**Automatic backups.** While the server runs it writes one backup a day to `backups/` and
+keeps the last 7 (both can be changed in the app settings). `make backup` and "Back up now"
+in the app settings write one immediately. A backup is one `.tar.gz` with a dump of the
+database and all uploaded files.
+
+Backups need the PostgreSQL client tools (`pg_dump` and `psql`). The app settings page says
+so when they are missing: `sudo apt install -y postgresql-client`.
+
+These backups are on the same disk as the data. Copy the `backups/` folder somewhere else
+now and then.
+
+**Restore.** In the app settings, pick a backup and choose Restore. It replaces all current
+data with the backup. The planner first saves the current state as another backup, so a
+restore can be undone the same way.
+
+To restore by hand, with the planner stopped:
+
+```bash
+mkdir -p /tmp/restore && tar -xzf backups/planner-<date>.tar.gz -C /tmp/restore
+sudo -u postgres dropdb planner
+make db                                # recreates an empty database
+psql "postgres://planner:planner@127.0.0.1:5432/planner" < /tmp/restore/planner.sql
+rm -rf data/uploads && cp -r /tmp/restore/uploads data/uploads
+```
+
+**Move one project to another computer.** On the project's Settings tab, "Whole project
+(.planner.zip)" downloads the plan, the board, the journal and every upload. On the other
+computer, open the app settings and choose that file under "Import a project". It is added
+as a new project and nothing existing is changed.
+
+## From the terminal
+
+`bin/planner status` prints where a project stands. It reads the database directly, so the
+server does not need to be running.
+
+```
+$ bin/planner status
+Link shortener — building
+  Clock      Skeleton: one endpoint answers in 1d 9h (Wed 18 Nov 23:59)
+  Progress   0 of 11 tasks done
+  Milestone  Skeleton: one endpoint answers — due in 1d 9h
+  Now        #141 Create the project skeleton (0 of 4 steps)
+
+$ bin/planner status --short
+Link shortener [build 1d 9h] · #141 Create the project skeleton
+```
+
+It picks the project whose linked repository folder you are in, otherwise the project you
+touched last.
+
+| Option | Meaning |
+| --- | --- |
+| `--short` | One line, for a shell prompt or a status bar. Prints nothing on an error |
+| `--here` | Print nothing unless you are inside a linked repository |
+| `--project N` | A specific project |
+| `--json` | The same facts as JSON |
+
+For a bash prompt, with `planner` on your `PATH`:
+
+```bash
+PS1='$(planner status --short --here 2>/dev/null) '$PS1
+```
 
 ## Troubleshooting
 
@@ -291,6 +452,13 @@ in `.env`.
 **`make setup` cannot download Go or Node.js.** Install them yourself (Go 1.22+, Node.js
 18+), make sure `go` and `node` are on your `PATH`, and run `make setup` again.
 
+**The app settings page says backups are not available.** Install the PostgreSQL client
+tools: `sudo apt install -y postgresql-client`, then restart the planner.
+
+**`planner status` cannot reach the database from another folder.** It reads the `.env`
+next to the program. If the planner's database is somewhere else, set
+`PLANNER_DATABASE_URL`.
+
 ## Development
 
 ```bash
@@ -298,10 +466,15 @@ make dev      # Go server on :8080, Vite with hot reload on http://localhost:517
 make test     # backend tests; creates and wipes a separate planner_test database
 ```
 
+The Vite dev server listens on `127.0.0.1` only. To reach it from another machine, set
+`PLANNER_DEV_HOST=0.0.0.0` and list the host names in `PLANNER_DEV_ALLOWED_HOSTS`.
+
 ```
 backend/
-  cmd/planner/            entry point
-  internal/planner/       the rules: deadlines, steps, hackathon schedule, task generation
+  cmd/planner/            entry point: the server and `planner status`
+  internal/planner/       the rules: deadlines, steps, scope and date tracking, hackathon
+                          schedule, task generation, export
+  internal/backup/        backups and restore
   internal/api/           HTTP routes (all under /api)
   internal/store/         SQL
   internal/database/      embedded migrations
@@ -310,8 +483,8 @@ backend/
 frontend/
   src/pages/              one file per tab
   src/steps/              the ten planning steps
-  src/components/         clock, sketch pad, shared UI
+  src/components/         clock, sketch pad, overview cards, search, shared UI
 scripts/                  setup, database, run, dev, backup
 ```
 
-More screenshots: [blueprint step](docs/blueprint.png), [board](docs/board.png).
+More screenshots: [blueprint step](docs/blueprint.png), [focus](docs/focus.png).

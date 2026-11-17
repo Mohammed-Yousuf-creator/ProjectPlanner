@@ -9,6 +9,10 @@ import Board from './pages/Board';
 import Journal from './pages/Journal';
 import Obstacles from './pages/Obstacles';
 import Files from './pages/Files';
+import Focus from './pages/Focus';
+import AppSettingsPage from './pages/AppSettings';
+import { GlobalSearch } from './components/Search';
+import { NotifyButton } from './components/Notify';
 import Hackathon from './pages/Hackathon';
 import Settings from './pages/Settings';
 
@@ -37,17 +41,22 @@ export default function App() {
           ProjectPlanner
         </Link>
         <span className="topbar-rule">Decide → plan for at most 14 days → code.</span>
+        <GlobalSearch />
+        <NotifyButton />
+        <Link to="/settings" className="icon-btn" aria-label="App settings and backups" title="App settings and backups"><Icon name="gear" size={18} /></Link>
         <button className="icon-btn" onClick={toggleTheme} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}>
           <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={18} />
         </button>
       </header>
       <Routes>
         <Route path="/" element={<Dashboard />} />
+        <Route path="/settings" element={<AppSettingsPage />} />
         <Route path="/p/:projectId" element={<ProjectLayout />}>
           <Route index element={<Overview />} />
           <Route path="blueprint" element={<Blueprint />} />
           <Route path="blueprint/:stepKey" element={<Blueprint />} />
           <Route path="board" element={<Board />} />
+          <Route path="focus" element={<Focus />} />
           <Route path="journal" element={<Journal />} />
           <Route path="obstacles" element={<Obstacles />} />
           <Route path="files" element={<Files />} />

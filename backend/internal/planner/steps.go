@@ -103,7 +103,7 @@ func ComputeSteps(p model.Project, d planData) []Step {
 			{"I know what makes it valuable", filled("value")},
 		},
 		"research": {
-			{"Every unknown I logged has an answer", countWhere(items["question"], "status", "open") == 0},
+			{"Every unknown is answered or pushed to “learn while building”", countWhere(items["question"], "status", "open") == 0},
 			{"I know where to look when I'm stuck", len(items["resource"]) > 0},
 		},
 		"stories": {
@@ -113,6 +113,7 @@ func ComputeSteps(p model.Project, d planData) []Step {
 			{"Every story is sorted: MVP, Later or Cut", nStories > 0 && tier["unsorted"] == 0},
 			{"The MVP has at least one story", tier["mvp"] > 0},
 			{"The MVP is at most half of the stories", nStories > 0 && tier["mvp"]*2 <= nStories},
+			{"The MVP fits the scope budget (" + strconv.Itoa(ScopeBudget(p)) + " stories)", tier["mvp"] <= ScopeBudget(p)},
 		},
 		"data": {
 			{"At least one data model with its fields", countWith(items["entity"], "fields") > 0},
@@ -126,7 +127,7 @@ func ComputeSteps(p model.Project, d planData) []Step {
 			{"At least two modules (black boxes) are named", len(items["module"]) >= 2},
 		},
 		"stack": {
-			{"The stack is written down", len(items["stack"]) > 0},
+			{"The stack is written down", countFilled(items["stack"], "choice") > 0},
 			{"Every capability is decided: build, buy or skip", countWhere(items["capability"], "decision", "undecided") == 0},
 			{"I know how this gets deployed", filled("deploy_path")},
 		},
@@ -175,6 +176,17 @@ func countWhere(items []map[string]any, key, value string) int {
 	n := 0
 	for _, it := range items {
 		if s, _ := it[key].(string); s == value {
+			n++
+		}
+	}
+	return n
+}
+
+// countFilled counts items whose key holds non-blank text.
+func countFilled(items []map[string]any, key string) int {
+	n := 0
+	for _, it := range items {
+		if s, _ := it[key].(string); strings.TrimSpace(s) != "" {
 			n++
 		}
 	}
